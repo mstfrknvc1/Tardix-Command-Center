@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Tardix Command Center</string>
+  </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>../../../İndirilenler/Gemini_Generated_Image_5dgedt5dgedt5dge-removebg-preview.png</normaloff>../../../İndirilenler/Gemini_Generated_Image_5dgedt5dgedt5dge-removebg-preview.png</iconset>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">/* Ana Pencere Arka Planı */
+QMainWindow {
+    background-color: #121212;
+}
+
+/* Tüm Yazılar */
+QLabel {
+    color: #e0e0e0;
+    font-family: &quot;Segoe UI&quot;;
+    font-size: 14px;
+}
+
+/* Neon Butonlar */
+QPushButton {
+    background-color: #1a1a1a;
+    color: #00ff9d;  /* Alienware Yeşili */
+    border: 2px solid #00ff9d;
+    border-radius: 8px;
+    padding: 8px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #00ff9d;
+    color: #000000;
+}
+QPushButton:pressed {
+    background-color: #00cc7a;
+}
+
+/* İlerleme Çubukları (CPU/RAM Grafikleri için) */
+QProgressBar {
+    border: 1px solid #444;
+    border-radius: 5px;
+    text-align: center;
+    color: white;
+    background-color: #222;
+}
+QProgressBar::chunk {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00ff9d, stop:1 #00bcd4);
+    border-radius: 4px;
+}</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>0</width>
+     <height>577</height>
+    </size>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="QPushButton" name="pushButton_2">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>Design/png/house-simple.png</normaloff>Design/png/house-simple.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>32</width>
+          <height>32</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_4">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>Design/png/lightbulb.png</normaloff>Design/png/lightbulb.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>32</width>
+          <height>32</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_3">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>Design/png/gear.png</normaloff>Design/png/gear.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>32</width>
+          <height>32</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>Design/png/info.png</normaloff>Design/png/info.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>32</width>
+          <height>32</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QStackedWidget" name="stackedWidget">
+        <widget class="QWidget" name="page"/>
+        <widget class="QWidget" name="page_2"/>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
