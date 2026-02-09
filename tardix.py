@@ -1,94 +1,64 @@
 import sys
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                             QLabel, QPushButton, QProgressBar)
-from PyQt6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QFile, QIODevice
 
-class AlienwareApp(QMainWindow):
+# Özel bileşeni import et
+from color_wheel import ColorWheel
+
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Alienware Control Center")
-        self.setGeometry(100, 100, 800, 600)
+        # UI Dosyasını Yükleme İşlemi
+        self.load_ui()
 
-        # --- 1. ANA TASARIM (QSS - Stil Dosyası) ---
-        # Burası "CSS" gibidir. Renkleri, kenarları buradan ayarlarsın.
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #121212; /* Koyu Arka Plan */
-            }
-            QLabel {
-                color: #ffffff;
-                font-size: 18px;
-                font-family: 'Segoe UI', sans-serif;
-            }
-            QPushButton {
-                background-color: #1e1e1e;
-                color: #00ff99;  /* Neon Yeşili Yazı */
-                border: 2px solid #00ff99; /* Neon Çerçeve */
-                border-radius: 10px;
-                padding: 10px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #00ff99;
-                color: #000000;
-            }
-            QProgressBar {
-                border: 2px solid #333;
-                border-radius: 5px;
-                text-align: center;
-                color: white;
-                background-color: #1e1e1e;
-            }
-            QProgressBar::chunk {
-                background-color: #00bcd4; /* Mavi Doluluk Rengi */
-                border-radius: 3px;
-            }
-        """)
+    def load_ui(self):
+        loader = QUiLoader()
 
-        # --- 2. ARAYÜZ ELEMANLARI ---
-        layout = QVBoxLayout()
+        # --- KRİTİK NOKTA: Custom Widget'ı Tanıtma ---
+        # Bunu yapmazsanız Qt Designer'daki promote işlemi çalışmaz.
+        loader.registerCustomWidget(ColorWheel)
 
-        # Başlık
-        self.label_title = QLabel("SİSTEM DURUMU")
-        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label_title.setStyleSheet("font-size: 24px; color: #00bcd4; font-weight: bold;")
-        layout.addWidget(self.label_title)
+        ui_file = QFile("main.ui")
+        if not ui_file.open(QIODevice.ReadOnly):
+            print(f"Hata: main.ui dosyası açılamadı: {ui_file.errorString()}")
+            sys.exit(-1)
 
-        # CPU Kullanım Çubuğu
-        self.cpu_label = QLabel("CPU Kullanımı:")
-        layout.addWidget(self.cpu_label)
+        # UI dosyasını yükle ve pencereyi al
+        self.window = loader.load(ui_file)
+        ui_file.close()
 
-        self.progress_cpu = QProgressBar()
-        self.progress_cpu.setRange(0, 100)
-        self.progress_cpu.setValue(45) # Örnek değer
-        layout.addWidget(self.progress_cpu)
+        if not self.window:
+            print(loader.errorString())
+            sys.exit(-1)
 
-        # Fan Hızı Butonu
-        self.btn_boost = QPushButton("TURBO FAN MODU: KAPALI")
-        self.btn_boost.setCheckable(True) # Basılı kalma özelliği
-        self.btn_boost.clicked.connect(self.toggle_fan_mode)
-        layout.addWidget(self.btn_boost)
+        # Pencereyi göster
+        self.window.show()
 
-        # Boşluk bırak (Esnek yapı)
-        layout.addStretch()
+        # --- Widget'a Erişim ve Sinyal Bağlama ---
+        # Qt Designer'da widget'a verdiğiniz 'objectName' neyse onu yazın.
+        # Örnek: 'widgetRenkSecici'
+        self.renk_tekerlegi = self.window.findChild(ColorWheel, "widgetRenkSecici")
 
-        # Widget'ları pencereye yerleştir
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-    def toggle_fan_mode(self):
-        if self.btn_boost.isChecked():
-            self.btn_boost.setText("TURBO FAN MODU: AÇIK")
-            self.btn_boost.setStyleSheet("background-color: #ff0055; color: white; border: 2px solid #ff0055;")
+        if self.renk_tekerlegi:
+            print("Renk Tekerleği Bulundu ve Bağlandı!")
+            self.renk_tekerlegi.colorChanged.connect(self.renk_degisti)
         else:
-            self.btn_boost.setText("TURBO FAN MODU: KAPALI")
-            # Varsayılan stile dönmek için styleSheet'i sıfırlamak veya üzerine yazmak gerekebilir
-            # Basitlik adına burada bırakıyorum.
+            print("UYARI: 'widgetRenkSecici' isminde bir widget bulunamadı!")
+            print("Lütfen Qt Designer'da objectName kısmını kontrol edin.")
+
+    def renk_degisti(self, yeni_renk):
+        # Renk kodunu al (#RRGGBB formatında)
+        renk_kodu = yeni_renk.name()
+        print(f"Seçilen Renk: {renk_kodu}")
+
+        # Örnek: Seçilen rengi pencerenin arka planı yap
+        # self.window.setStyleSheet(f"background-color: {renk_kodu};")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = AlienwareApp()
-    window.show()
+    main_app = MainWindow()
+    # Not: MainWindow sınıfı içinde self.window.show() çağrıldığı için
+    # burada tekrar main_app.show() demeye gerek yoktur.
     sys.exit(app.exec())
