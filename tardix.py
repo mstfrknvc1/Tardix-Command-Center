@@ -2,7 +2,7 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QIODevice
-
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QStackedWidget, QPushButton
 # Özel bileşeni import et
 from color_wheel import ColorWheel
 
@@ -13,11 +13,9 @@ class MainWindow(QMainWindow):
         # UI Dosyasını Yükleme İşlemi
         self.load_ui()
 
+
     def load_ui(self):
         loader = QUiLoader()
-
-        # --- KRİTİK NOKTA: Custom Widget'ı Tanıtma ---
-        # Bunu yapmazsanız Qt Designer'daki promote işlemi çalışmaz.
         loader.registerCustomWidget(ColorWheel)
 
         ui_file = QFile("main.ui")
@@ -25,7 +23,6 @@ class MainWindow(QMainWindow):
             print(f"Hata: main.ui dosyası açılamadı: {ui_file.errorString()}")
             sys.exit(-1)
 
-        # UI dosyasını yükle ve pencereyi al
         self.window = loader.load(ui_file)
         ui_file.close()
 
@@ -33,13 +30,30 @@ class MainWindow(QMainWindow):
             print(loader.errorString())
             sys.exit(-1)
 
-        # Pencereyi göster
+        self.main_stack = self.window.findChild(QStackedWidget, "stackedWidget")
+        self.btn_home = self.window.findChild(QPushButton, "homebutton")
+        self.btn_info = self.window.findChild(QPushButton, "infobutton")
+        self.btn_rgb = self.window.findChild(QPushButton, "rgbbutton")
+        self.btn_settings = self.window.findChild(QPushButton, "settingsbutton")
+        self.btn_fan = self.window.findChild(QPushButton, "fanbutton")
+
+        # Sayfa geçişleri için sinyal bağlantıları
+# Sayfa geçişleri için sinyal bağlantıları
+        if self.main_stack:
+            self.btn_home.clicked.connect(lambda: self.main_stack.setCurrentIndex(0))  # Home
+            self.btn_info.clicked.connect(lambda: self.main_stack.setCurrentIndex(4))  # Info
+            self.btn_rgb.clicked.connect(lambda: self.main_stack.setCurrentIndex(2))  # RGB
+            self.btn_settings.clicked.connect(lambda: self.main_stack.setCurrentIndex(3))  # Settings
+            self.btn_fan.clicked.connect(lambda: self.main_stack.setCurrentIndex(1))  # Fan
+        else:
+            print("HATA: 'stackedWidget' bulunamadı! Designer'daki ismini kontrol et.")
+
         self.window.show()
 
         # --- Widget'a Erişim ve Sinyal Bağlama ---
         # Qt Designer'da widget'a verdiğiniz 'objectName' neyse onu yazın.
         # Örnek: 'widgetRenkSecici'
-        self.renk_tekerlegi = self.window.findChild(ColorWheel, "widgetRenkSecici")
+        self.renk_tekerlegi = self.window.findChild(ColorWheel, "colorwheel")
 
         if self.renk_tekerlegi:
             print("Renk Tekerleği Bulundu ve Bağlandı!")

@@ -1,38 +1,101 @@
-import tkinter as tk
+import sys
+import math
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem
+from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtGui import QBrush, QColor
 
-from math import cos, sin, pi, atan2
+class ColorWheel(QWidget):
+    def __init__(self):
+        super().__init__()
 
-def rgb_from_angle(angle):
-    """Açıyı RGB değerine çevir"""
-    r = int((cos(angle) + 1) * 127)
-    g = int((cos(angle - 2*pi/3) + 1) * 127)
-    b = int((cos(angle - 4*pi/3) + 1) * 127)
-    return r, g, b
+        self.setWindowTitle("RGB Renk Tekerleği")
+        self.setGeometry(100, 100, 400, 400)
 
-def click(event):
-    x, y = event.x - 150, event.y - 150
-    angle = (pi + (pi + -1*atan2(y, x))) % (2*pi)
-    r, g, b = rgb_from_angle(angle)
-    color = f'#{r:02x}{g:02x}{b:02x}'
-    label.config(text=f'Seçilen renk: {color}', bg=color)
+        self.color1 = QColor(255, 0, 0)  # Başlangıç rengi kırmızı
+        self.color2 = QColor(0, 255, 0)  # Başlangıç rengi yeşil
 
-root = tk.Tk()
-root.title("RGB Renk Tekerleği")
+        self.initUI()
 
-canvas = tk.Canvas(root, width=300, height=300)
-canvas.pack()
+    def initUI(self):
+        # Layout
+        layout = QVBoxLayout(self)
 
-# Renk çarkını çiz
-for i in range(360):
-    angle1 = i * pi / 180
-    angle2 = (i+1) * pi / 180
-    r, g, b = rgb_from_angle(angle1)
-    color = f'#{r:02x}{g:02x}{b:02x}'
-    canvas.create_arc(0, 0, 300, 300, start=i, extent=1, style=tk.PIESLICE, fill=color, outline='')
+        # İlk renk etiketi ve kutusu
+        self.label1 = QLabel("Henüz renk 1 seçilmedi", self)
+        layout.addWidget(self.label1)
 
-canvas.bind("<Button-1>", click)
+        self.color_display1 = QLabel(self)
+        self.color_display1.setFixedSize(100, 50)
+        self.color_display1.setStyleSheet("background-color: red;")
+        layout.addWidget(self.color_display1)
 
-label = tk.Label(root, text="Henüz renk seçilmedi", width=30, height=2)
-label.pack(pady=10)
+        # İkinci renk etiketi ve kutusu
+        self.label2 = QLabel("Henüz renk 2 seçilmedi", self)
+        layout.addWidget(self.label2)
 
-root.mainloop()
+        self.color_display2 = QLabel(self)
+        self.color_display2.setFixedSize(100, 50)
+        self.color_display2.setStyleSheet("background-color: green;")
+        layout.addWidget(self.color_display2)
+
+        # Renk çarkı
+        self.scene = QGraphicsScene(self)
+        self.view = QGraphicsView(self.scene, self)
+        self.view.setGeometry(50, 50, 300, 300)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.scene.setSceneRect(QRectF(0, 0, 300, 300))
+
+        self.draw_color_wheel()
+
+        layout.addWidget(self.view)
+
+    def draw_color_wheel(self):
+        # Çark için dairesel dilimler çiz
+        for i in range(360):
+            angle1 = i * math.pi / 180
+            angle2 = (i + 1) * math.pi / 180
+            r, g, b = self.rgb_from_angle(angle1)
+            color = QColor(r, g, b)
+
+            item = QGraphicsEllipseItem(0, 0, 300, 300)
+            item.setStartAngle(i * 16)
+            item.setSpanAngle(16)
+            item.setBrush(QBrush(color))
+            item.setPen(Qt.NoPen)
+            self.scene.addItem(item)
+
+        # Mouse tıklama olayı
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.view.viewport().installEventFilter(self)
+
+    def rgb_from_angle(self, angle):
+        """Açıyı RGB değerine çevir"""
+        r = int((math.cos(angle) + 1) * 127)
+        g = int((math.cos(angle - 2*math.pi/3) + 1) * 127)
+        b = int((math.cos(angle - 4*math.pi/3) + 1) * 127)
+        return r, g, b
+
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.MouseButtonPress and source is self.view.viewport():
+            if event.button() == Qt.LeftButton:  # Sol tıklama, birinci renk seçimi
+                self.select_color(event, self.label1, self.color_display1, 1)
+            elif event.button() == Qt.RightButton:  # Sağ tıklama, ikinci renk seçimi
+                self.select_color(event, self.label2, self.color_display2, 2)
+            return True
+        return False
+
+    def select_color(self, event, label, color_display, color_number):
+        x, y = event.pos().x() - 150, event.pos().y() - 150
+        angle = (math.pi + (math.pi + -1 * math.atan2(y, x))) % (2 * math.pi)
+        r, g, b = self.rgb_from_angle(angle)
+        color = QColor(r, g, b)
+        color_str = color.name()
+
+        label.setText(f'Seçilen renk {color_number}: {color_str}')
+        color_display.setStyleSheet(f"background-color: {color_str};")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ColorWheel()
+    window.show()
+    sys.exit(app.exec_())
