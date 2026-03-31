@@ -14,7 +14,9 @@ class _WheelCanvas(QWidget):
 
         self.hue = 0.0
         self.saturation = 1.0
-        self.value = 1.0 # Parlaklık dışarıdan (slider'dan) gelecek
+        # Görsel parlaklık (wheel üzerindeki siyahlık perdesi).
+        # Bu değer, Tardix UI'deki "Brightness" ayarından bağımsız olmalı.
+        self.value = 1.0
 
     def setBrightness(self, val_float):
         self.value = val_float
@@ -22,7 +24,9 @@ class _WheelCanvas(QWidget):
         self.update()
 
     def emitColor(self):
-        c = QColor.fromHsvF(self.hue, self.saturation, self.value)
+        # Renk seçimi wheel üzerinde "tam parlaklık" mantığıyla çalışsın.
+        # (Parlaklık ayarı klavyeye uygulanacak; wheel görüntüsünü etkilemeyecek.)
+        c = QColor.fromHsvF(self.hue, self.saturation, 1.0)
         self.colorChanged.emit(c)
 
     def paintEvent(self, event):
@@ -55,11 +59,8 @@ class _WheelCanvas(QWidget):
         painter.drawEllipse(center, int(radius), int(radius))
 
         # 3. Siyahlık (Value - Üzerine siyah perde)
-        black_overlay = QColor(0, 0, 0)
-        alpha = int((1.0 - self.value) * 255)
-        black_overlay.setAlpha(alpha)
-        painter.setBrush(QBrush(black_overlay))
-        painter.drawEllipse(center, int(radius), int(radius))
+        # Wheel görüntüsünde parlaklık sabit (value=1.0) kalsın:
+        # Siyah perdeyi çizme.
 
         # 4. Seçici
         angle_rad = math.radians((self.hue * 360) + 90)
@@ -68,7 +69,7 @@ class _WheelCanvas(QWidget):
         sel_y = center.y() - dist * math.sin(angle_rad)
 
         # Seçici rengi (zıt renk olsun)
-        stroke_color = QColor("white") if self.value < 0.5 else QColor("black")
+        stroke_color = QColor("black")
         painter.setPen(QPen(stroke_color, 2))
         painter.setBrush(Qt.NoBrush)
         painter.drawEllipse(QPointF(sel_x, sel_y), 8, 8)
@@ -115,21 +116,16 @@ class ColorWheel(QWidget):
         self.canvas = _WheelCanvas()
         layout.addWidget(self.canvas)
 
-        # 2. Slider'ı ekle (Siyahlık/Parlaklık için)
+        # Wheel içi parlaklık slider'ını (eski davranış) kapalı tutuyoruz.
+        # Parlaklık ayarı Tardix UI'deki ayrı slider ile klavyeye uygulanacak.
         self.brightness_slider = QSlider(Qt.Horizontal)
         self.brightness_slider.setRange(0, 255)
-        self.brightness_slider.setValue(255) # Varsayılan tam parlak
-        self.brightness_slider.setToolTip("Parlaklık / Siyahlık Ayarı")
-        layout.addWidget(self.brightness_slider)
-
-        # Bağlantılar
-        # Slider değişince tekerleğe haber ver
-        self.brightness_slider.valueChanged.connect(self.on_brightness_changed)
+        self.brightness_slider.setValue(255)
+        self.brightness_slider.hide()
 
         # Tekerlek renk değiştirince dışarıya (tardix'e) sinyal ver
         self.canvas.colorChanged.connect(self.colorChanged)
 
     def on_brightness_changed(self, value):
-        # 0-255 arasını 0.0-1.0 arasına çevir
-        val_float = value / 255.0
-        self.canvas.setBrightness(val_float)
+        # Eski API uyumluluğu: çağrılsa bile wheel görünümünü etkilemesin.
+        self.canvas.setBrightness(1.0)
