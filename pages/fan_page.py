@@ -1,6 +1,4 @@
-import random
-
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -14,6 +12,7 @@ from PySide6.QtWidgets import (
 from widgets.fan_widget import FanWidget
 from widgets.temperature_gauge import TemperatureGauge
 from core.utils import _clear_layout
+from core.sensors import SensorPoller
 
 
 class FanMixin:
@@ -24,10 +23,10 @@ class FanMixin:
         if not fan_page:
             return
 
-        # Stop existing polling timer to avoid multiple timers after retranslate
-        if self.timer:
-            self.timer.stop()
-            self.timer = None
+        # Stop any existing sensor poller before rebuilding
+        if hasattr(self, "_sensor_poller"):
+            self._sensor_poller.stop()
+            del self._sensor_poller
 
         root_layout = fan_page.layout()
         if root_layout is None:
@@ -103,12 +102,13 @@ class FanMixin:
         self.fan1_slider.sliderReleased.connect(lambda: self._on_fan_boost(1))
         self.fan2_slider.sliderReleased.connect(lambda: self._on_fan_boost(2))
 
-        if getattr(self, "is_root", False) and self.is_dell_g_series:
-            self.timer = QTimer(self.window)
-            self.timer.setInterval(1000)
-            self.timer.timeout.connect(self.get_rpm_and_temp)
-            self.timer.start()
-        else:
+        # SensorPoller reads sensors on a background QThread and delivers
+        # results via a queued signal — the animation timer is never blocked.
+        self._sensor_poller = SensorPoller(interval_ms=1000, parent=self.window)
+        self._sensor_poller.data_ready.connect(self._update_sensor_ui)
+        self._sensor_poller.start()
+
+        if not (getattr(self, "is_root", False) and self.is_dell_g_series):
             self.fan_info.setText(self.tr("fan_root_warn"))
 
     def _fan_row(self, parent: QWidget, title: str, setting_key: str, vbox: QVBoxLayout):
@@ -173,29 +173,13 @@ class FanMixin:
             self.settings.setValue("Fan2 Boost", new_val)
             self.fan_info.setText(f"Fan2 Boost: {int(last,0)/0xFF*100:.0f}% → {int(now,0)/0xFF*100:.0f}%.")
 
+    def _update_sensor_ui(self, fan1: int, cpu: int, fan2: int, gpu: int):
+        if hasattr(self, "fan1_widget"):    self.fan1_widget.set_rpm(fan1)
+        if hasattr(self, "cpu_temp_gauge"): self.cpu_temp_gauge.set_temperature(cpu)
+        if hasattr(self, "fan2_widget"):    self.fan2_widget.set_rpm(fan2)
+        if hasattr(self, "gpu_temp_gauge"): self.gpu_temp_gauge.set_temperature(gpu)
+        if hasattr(self, "fan1_current"):   self.fan1_current.setText(f"{fan1} RPM, {cpu} °C")
+        if hasattr(self, "fan2_current"):   self.fan2_current.setText(f"{fan2} RPM, {gpu} °C")
+
     def get_rpm_and_temp(self):
-        if not self.window.isVisible():
-            return
-        try:
-            if getattr(self, "is_root", False) and self.is_dell_g_series:
-                fan1_rpm_int = int(self.acpi_call("get_fan1_rpm"), 0)
-                cpu_temp_int = int(self.acpi_call("get_cpu_temp"),  0)
-                fan2_rpm_int = int(self.acpi_call("get_fan2_rpm"), 0)
-                gpu_temp_int = int(self.acpi_call("get_gpu_temp"),  0)
-            else:
-                cpu_temp_int = random.randint(45, 85)
-                gpu_temp_int = random.randint(40, 80)
-                fan1_rpm_int = random.randint(1500, 5000)
-                fan2_rpm_int = random.randint(1200, 4500)
-                if not getattr(self, "_temp_warning_shown", False):
-                    self._temp_warning_shown = True
-                    self.fan_info.setText(self.tr("fan_demo_warn"))
-            if hasattr(self, "fan1_widget"):    self.fan1_widget.set_rpm(fan1_rpm_int)
-            if hasattr(self, "cpu_temp_gauge"): self.cpu_temp_gauge.set_temperature(cpu_temp_int)
-            if hasattr(self, "fan2_widget"):    self.fan2_widget.set_rpm(fan2_rpm_int)
-            if hasattr(self, "gpu_temp_gauge"): self.gpu_temp_gauge.set_temperature(gpu_temp_int)
-            self.fan1_current.setText(f"{fan1_rpm_int} RPM, {cpu_temp_int} °C")
-            self.fan2_current.setText(f"{fan2_rpm_int} RPM, {gpu_temp_int} °C")
-        except Exception as e:
-            if hasattr(self, "fan_info"):
-                self.fan_info.setText(f"⚠️  Sıcaklık verisi alınamıyor: {str(e)[:50]}")
+        pass  # kept for compatibility; polling is now handled by SensorPoller
