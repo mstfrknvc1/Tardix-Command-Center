@@ -2,6 +2,7 @@
 import sys
 import argparse
 import random
+import usb
 from .elc import *
 from .elc_constants import *
 
@@ -147,23 +148,41 @@ def set_color_and_morph(red, green, blue,red_morph, green_morph, blue_morph, dur
     device.reset()
 
 def remove_animation():
-    set_dim(100)
-    elc, device = init_device()
-    elc.remove_animation(AC_SLEEP)
-    elc.remove_animation(AC_CHARGED)
-    elc.remove_animation(AC_CHARGING)
-    elc.remove_animation(DC_SLEEP)
-    elc.remove_animation(DC_ON)
-    elc.remove_animation(DC_LOW)
-    # elc.remove_animation(DEFAULT_POST_BOOT)
-    # elc.remove_animation(RUNNING_START)
-    # elc.remove_animation(RUNNING_FINISH)
-    animations = elc.get_animation_count()
-    while animations != (0,0):
-        print("Removing unknown animation {}".format(animations[1]))
-        elc.remove_animation(animations[1])
-        animations = elc.get_animation_count()
-    device.reset()
+    try:
+        set_dim(100)
+        elc, device = init_device()
+        for animation in (AC_SLEEP, AC_CHARGED, AC_CHARGING, DC_SLEEP, DC_ON, DC_LOW):
+            try:
+                elc.remove_animation(animation)
+            except usb.core.USBError:
+                break
+
+        seen_animation_ids = set()
+        for _ in range(8):
+            try:
+                animations = elc.get_animation_count()
+            except usb.core.USBError:
+                break
+
+            if animations == (0, 0):
+                break
+
+            unknown_animation = animations[1]
+            if unknown_animation in (0, None) or unknown_animation in seen_animation_ids:
+                break
+
+            seen_animation_ids.add(unknown_animation)
+            try:
+                elc.remove_animation(unknown_animation)
+            except usb.core.USBError:
+                break
+
+        try:
+            device.reset()
+        except usb.core.USBError:
+            pass
+    except usb.core.USBError:
+        pass
 
 def set_dim(level):
     elc, device = init_device()

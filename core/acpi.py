@@ -1,3 +1,5 @@
+import os
+
 try:
     import pexpect  # type: ignore
 except ModuleNotFoundError:
@@ -15,10 +17,81 @@ from .patch import (
 class ACPIMixin:
     """ACPI/hardware control and laptop model detection."""
 
+    def _has_awelc_usb(self) -> bool:
+        """Return True if an Alienware LED USB controller is present."""
+        usb_root = "/sys/bus/usb/devices"
+        if not os.path.isdir(usb_root):
+            return False
+
+        for entry in os.listdir(usb_root):
+            base = os.path.join(usb_root, entry)
+            vendor_p = os.path.join(base, "idVendor")
+            product_p = os.path.join(base, "idProduct")
+            try:
+                with open(vendor_p, "r", encoding="utf-8", errors="ignore") as f:
+                    vendor = f.read().strip().lower()
+                with open(product_p, "r", encoding="utf-8", errors="ignore") as f:
+                    product = f.read().strip().lower()
+            except OSError:
+                continue
+
+            if vendor == "187c" and product in {"0550", "0551"}:
+                return True
+        return False
+
+    def _detect_model_fallback(self):
+        """Best-effort model detection from DMI for non-root startup paths."""
+        paths = [
+            "/sys/class/dmi/id/sys_vendor",
+            "/sys/class/dmi/id/product_name",
+            "/sys/class/dmi/id/product_version",
+            "/sys/class/dmi/id/board_name",
+        ]
+        text_parts = []
+        for p in paths:
+            try:
+                with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                    text_parts.append(f.read().strip())
+            except OSError:
+                pass
+
+        text = " ".join(text_parts).lower()
+        if not text:
+            return
+
+        model_map = {
+            "g15 5530": ("G15 5530", True, True),
+            "g15 5525": ("G15 5525", True, True),
+            "g15 5520": ("G15 5520", True, True),
+            "g15 5511": ("G15 5511", True, True),
+            "g15 5515": ("G15 5515", True, True),
+            "g16 7630": ("G16 7630", True, False),
+            "g16 7620": ("G16 7620", True, True),
+            "alienware m16": ("Alienware M16", True, True),
+        }
+        for key, (model, supported, kb) in model_map.items():
+            if key in text:
+                self.model = model
+                self.is_dell_g_series = supported
+                self.is_keyboard_supported = kb
+                return
+
+        # If it is a Dell/Alienware machine but exact model is unknown.
+        if "dell" in text or "alienware" in text:
+            self.is_dell_g_series = False
+            if self.model == "Unknown":
+                product = next((p for p in text_parts if p), "Unknown")
+                self.model = product
+
     def init_acpi_call(self):
+        # Try detection early so Home page can show a meaningful model even without root.
+        self._detect_model_fallback()
+        # RGB support is hardware-USB based and can be true even on unsupported models.
+        if self._has_awelc_usb():
+            self.is_keyboard_supported = True
+
         if pexpect is None:
             self.is_root = False
-            self.is_dell_g_series = False
             return
 
         self.acpi_call_dict = {
@@ -57,6 +130,10 @@ class ACPIMixin:
             return
 
         self._check_laptop_model()
+        if self.model == "Unknown":
+            self._detect_model_fallback()
+        if self._has_awelc_usb():
+            self.is_keyboard_supported = True
 
     def _check_laptop_model(self):
         # Intel

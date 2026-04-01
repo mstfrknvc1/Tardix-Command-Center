@@ -2,7 +2,7 @@
   <rect x="10" y="20" width="880" height="260" rx="24" fill="#0f0f12" stroke="#2a2a33" stroke-width="4"/>
   <rect x="40" y="55" width="820" height="170" rx="14" fill="#15151a" stroke="#2a2a33" stroke-width="2"/>
   <!-- key grid -->
-  <g fill="#1c1c22" stroke="#2f2f3a" stroke-width="2">
+  <g fill="__KEY_COLOR__" stroke="#2f2f3a" stroke-width="2">
     <!-- row 1 -->
     <rect x="60" y="75" width="55" height="40" rx="8"/>
     <rect x="125" y="75" width="55" height="40" rx="8"/>

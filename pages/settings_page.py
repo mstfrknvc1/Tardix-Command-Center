@@ -1,3 +1,5 @@
+import os
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -11,6 +13,14 @@ from PySide6.QtWidgets import (
 )
 
 from core.i18n import TRANSLATIONS
+from core.app_meta import (
+    APP_CLI,
+    APP_DESCRIPTION,
+    APP_GENERIC_NAME,
+    APP_NAME,
+    APP_VERSION,
+    APP_DEVELOPER,
+)
 from core.utils import _clear_layout
 
 
@@ -35,6 +45,7 @@ class SettingsMixin:
             self.settings.value("DisableTurboBoost", "false") == "true"
         )
         self.turbo_boost_toggle.toggled.connect(self._on_turbo_boost_toggled)
+        self._apply_turbo_boost(self.turbo_boost_toggle.isChecked())
         perf_layout.addWidget(self.turbo_boost_toggle)
         perf_layout.addWidget(QLabel(self.tr("turbo_note"), settings_page))
         layout.addWidget(perf_group)
@@ -62,6 +73,16 @@ class SettingsMixin:
         lang_layout.addWidget(self.language_combo, 1)
         layout.addWidget(lang_group)
 
+        startup_group = QGroupBox(self.tr("autostart_section"), settings_page)
+        startup_layout = QVBoxLayout(startup_group)
+        _autostart_path = os.path.expanduser("~/.config/autostart/tardix-command-center.desktop")
+        self.autostart_toggle = QCheckBox(self.tr("autostart"), settings_page)
+        self.autostart_toggle.setChecked(os.path.exists(_autostart_path))
+        self.autostart_toggle.toggled.connect(self._on_autostart_toggled)
+        startup_layout.addWidget(self.autostart_toggle)
+        startup_layout.addWidget(QLabel(self.tr("autostart_note"), settings_page))
+        layout.addWidget(startup_group)
+
         layout.addStretch()
 
     def _on_language_changed_handler(self, language: str):
@@ -80,6 +101,51 @@ class SettingsMixin:
 
     def _on_turbo_boost_toggled(self, checked: bool):
         self.settings.setValue("DisableTurboBoost", "true" if checked else "false")
+        self._apply_turbo_boost(checked)
+
+    def _apply_turbo_boost(self, disable: bool):
+        """Write to sysfs to enable/disable CPU Turbo Boost (requires root)."""
+        if not getattr(self, "is_root", False):
+            return
+        intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+        amd_path = "/sys/devices/system/cpu/cpufreq/boost"
+        try:
+            probe = self.shell_exec(
+                f"[ -f {intel_path} ] && echo intel "
+                f"|| ([ -f {amd_path} ] && echo amd || echo none)"
+            )
+            cpu_type = probe[1].strip() if len(probe) > 1 else "none"
+            if cpu_type == "intel":
+                self.shell_exec(f"echo {'1' if disable else '0'} > {intel_path}")
+            elif cpu_type == "amd":
+                self.shell_exec(f"echo {'0' if disable else '1'} > {amd_path}")
+        except Exception:
+            pass
+
+    def _on_autostart_toggled(self, enabled: bool):
+        autostart_dir = os.path.expanduser("~/.config/autostart")
+        dest = os.path.join(autostart_dir, "tardix-command-center.desktop")
+        if enabled:
+            os.makedirs(autostart_dir, exist_ok=True)
+            icon_path = os.path.join(self.script_dir, "Design", "png", "logo.png")
+            with open(dest, "w") as f:
+                f.write(
+                    "[Desktop Entry]\n"
+                    "Type=Application\n"
+                    f"Name={APP_NAME}\n"
+                    f"GenericName={APP_GENERIC_NAME}\n"
+                    f"Exec={APP_CLI} --background\n"
+                    f"TryExec={APP_CLI}\n"
+                    f"Icon={icon_path}\n"
+                    f"Comment={APP_DESCRIPTION}\n"
+                    f"X-Developer={APP_DEVELOPER}\n"
+                    f"X-AppVersion={APP_VERSION}\n"
+                    "Hidden=false\nNoDisplay=false\n"
+                    "X-GNOME-Autostart-enabled=true\n"
+                )
+        else:
+            if os.path.exists(dest):
+                os.remove(dest)
 
     def _on_temp_limit_changed(self, value: int):
         value = max(85, min(100, int(value)))

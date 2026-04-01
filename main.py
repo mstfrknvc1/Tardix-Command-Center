@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+import argparse
+from datetime import datetime
 import sys
 import os
+import traceback
 
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QIODevice, QSettings
@@ -17,6 +20,13 @@ from widgets.color_wheel import ColorWheel
 from widgets.fan_widget import FanWidget
 from widgets.temperature_gauge import TemperatureGauge
 from core.i18n import TRANSLATIONS
+from core.app_meta import (
+    APP_ID,
+    APP_NAME,
+    APP_ORGANIZATION,
+    APP_ORGANIZATION_DOMAIN,
+    APP_VERSION,
+)
 
 from pages.home_page import HomeMixin
 from pages.rgb_page import RGBMixin
@@ -33,9 +43,61 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
                 InfoMixin, MacroMixin, LEDMixin, ACPIMixin):
     """Main application controller – loads main.ui and wires all pages."""
 
-    def __init__(self):
+    def __init__(self, start_hidden: bool = False):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self._start_hidden = start_hidden
+        self._init_runtime_logging()
         self._load_ui()
+
+    def _init_runtime_logging(self):
+        log_dir = os.path.join(os.path.expanduser("~"), ".cache", "tardix-command-center")
+        os.makedirs(log_dir, exist_ok=True)
+        self.runtime_log_path = os.path.join(log_dir, "runtime.log")
+
+    def log_event(self, message: str):
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        try:
+            with open(self.runtime_log_path, "a", encoding="utf-8") as handle:
+                handle.write(f"[{timestamp}] {message}\n")
+        except OSError:
+            pass
+
+    def log_exception(self, context: str, err: Exception):
+        self.log_event(f"{context}: {err.__class__.__name__}: {err}")
+        try:
+            with open(self.runtime_log_path, "a", encoding="utf-8") as handle:
+                handle.write(traceback.format_exc())
+                handle.write("\n")
+        except OSError:
+            pass
+
+    def _app_icon(self):
+        for icon_name in ["logo.png", "tardix.png", "icon.png", "atom.png"]:
+            icon_path = os.path.join(self.script_dir, "Design", "png", icon_name)
+            if os.path.exists(icon_path):
+                return QIcon(icon_path)
+        return QIcon.fromTheme("alienarena")
+
+    def _icon_from_design(self, filename: str) -> QIcon:
+        icon_path = os.path.join(self.script_dir, "Design", "png", filename)
+        return QIcon(icon_path) if os.path.exists(icon_path) else QIcon()
+
+    def _apply_sidebar_icons(self):
+        icon_map = {
+            "btn_home": "house-simple.png",
+            "btn_fan": "fan.png",
+            "btn_rgb": "lightbulb.png",
+            "btn_macro": "keyboard.png",
+            "btn_settings": "gear.png",
+            "btn_info": "info.png",
+        }
+        for attr_name, filename in icon_map.items():
+            button = getattr(self, attr_name, None)
+            if button is None:
+                continue
+            icon = self._icon_from_design(filename)
+            if not icon.isNull():
+                button.setIcon(icon)
 
     # ──────────────────────────────────────────────────────────
     # Translation helper
@@ -68,11 +130,9 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
         if not self.window:
             raise RuntimeError(loader.errorString())
 
-        for icon_name in ["icon.png", "logo.png", "tardix.png", "atom.png"]:
-            icon_path = os.path.join(self.script_dir, "Design", "png", icon_name)
-            if os.path.exists(icon_path):
-                self.window.setWindowIcon(QIcon(icon_path))
-                break
+        icon = self._app_icon()
+        if not icon.isNull():
+            self.window.setWindowIcon(icon)
 
         self.settings = QSettings("Tardix", "CommandCenter")
 
@@ -88,6 +148,7 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
             self.logfile = open("/tmp/tardix-command-center.log", "w")
         except Exception:
             self.logfile = None
+        self.log_event("Application startup")
 
         self.init_acpi_call()
 
@@ -98,6 +159,7 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
         self.btn_macro     = self.window.findChild(QPushButton, "macrobutton")
         self.btn_settings  = self.window.findChild(QPushButton, "settingsbutton")
         self.btn_info      = self.window.findChild(QPushButton, "infobutton")
+        self._apply_sidebar_icons()
 
         if self.main_stack:
             page_home     = self.window.findChild(QWidget, "ahome")
@@ -126,7 +188,36 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
         self._init_info_page()
         self._init_macro_page()
 
-        self.window.show()
+        self.window.closeEvent = self._handle_window_close
+        if self._start_hidden:
+            self.window.hide()
+        else:
+            self.window.show()
+
+    def _cleanup(self):
+        self.log_event("Application shutdown")
+        if hasattr(self, "_stop_sensor_poller"):
+            self._stop_sensor_poller()
+        shell = getattr(self, "shell", None)
+        if shell is not None:
+            try:
+                shell.close(force=True)
+            except Exception:
+                pass
+        logfile = getattr(self, "logfile", None)
+        if logfile is not None:
+            try:
+                logfile.close()
+            except Exception:
+                pass
+
+    def _handle_window_close(self, event):
+        if self._start_hidden:
+            self.window.hide()
+            event.ignore()
+            return
+        self._cleanup()
+        event.accept()
 
     # ──────────────────────────────────────────────────────────
     # Chrome (window title + sidebar tooltips)
@@ -142,20 +233,30 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
 
 
 def main():
-    qt_app = QApplication(sys.argv)
-    qt_app.setQuitOnLastWindowClosed(False)
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--background", action="store_true")
+    args, qt_args = parser.parse_known_args()
 
-    icon = QIcon.fromTheme("alienarena")
+    qt_app = QApplication([sys.argv[0], *qt_args])
+    qt_app.setApplicationName(APP_NAME)
+    qt_app.setApplicationDisplayName(APP_NAME)
+    qt_app.setApplicationVersion(APP_VERSION)
+    qt_app.setOrganizationName(APP_ORGANIZATION)
+    qt_app.setOrganizationDomain(APP_ORGANIZATION_DOMAIN)
+    qt_app.setDesktopFileName(APP_ID)
+    qt_app.setQuitOnLastWindowClosed(not args.background)
+
+    app = TardixApp(start_hidden=args.background)
+    icon = app._app_icon()
     if not icon.isNull():
         qt_app.setWindowIcon(icon)
-
-    app = TardixApp()
+    qt_app.aboutToQuit.connect(app._cleanup)
 
     tray = TrayIcon(app)
     if not icon.isNull():
         tray.setIcon(icon)
     tray.setVisible(True)
-    tray.setToolTip("Left click: toggle leds. Right click: menu.")
+    tray.setToolTip(APP_NAME)
 
     menu = QMenu()
     action_show = QAction("Show Window")

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.utils import _clear_layout
+from core.app_meta import APP_VERSION, VERSION_SCHEME
 
 
 class InfoMixin:
@@ -35,6 +36,19 @@ class InfoMixin:
         f = title.font(); f.setPointSize(16); f.setBold(True); title.setFont(f)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scroll_layout.addWidget(title)
+
+        version_group = QGroupBox(self.tr("version_group"))
+        version_layout = QVBoxLayout(version_group)
+        version_lbl = QLabel(
+            self.tr(
+                "version_text",
+                version=APP_VERSION,
+                scheme=VERSION_SCHEME,
+            )
+        )
+        version_lbl.setWordWrap(True)
+        version_layout.addWidget(version_lbl)
+        scroll_layout.addWidget(version_group)
 
         desc_group = QGroupBox(self.tr("description"))
         desc_layout = QVBoxLayout(desc_group)

@@ -1,5 +1,9 @@
+import os
+import subprocess
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QPushButton,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -18,15 +22,72 @@ from core.sensors import SensorPoller
 class FanMixin:
     """Fan/Power page UI logic."""
 
+    def _stop_sensor_poller(self):
+        poller = getattr(self, "_sensor_poller", None)
+        if poller is None:
+            return
+        try:
+            poller.stop()
+        except Exception:
+            pass
+        try:
+            del self._sensor_poller
+        except Exception:
+            pass
+
+    def _power_mode_label(self, key: str) -> str:
+        return self.tr(f"power_mode_{key.lower().replace(' ', '_')}")
+
+    def _acpi_backend_available(self) -> bool:
+        return bool(getattr(self, "is_root", False) and getattr(self, "is_dell_g_series", False))
+
+    def _platform_profile_available(self) -> bool:
+        return os.path.exists("/sys/firmware/acpi/platform_profile")
+
+    def _available_backend_modes(self) -> list[str]:
+        modes = []
+        if self._acpi_backend_available():
+            modes.append("acpi")
+        if self._platform_profile_available():
+            modes.append("platform_profile")
+        return modes
+
+    def _resolved_backend_mode(self) -> str:
+        forced = self.settings.value("PowerBackend", "auto")
+        available = self._available_backend_modes()
+        if forced in available:
+            return forced
+        if forced == "auto":
+            if "acpi" in available:
+                return "acpi"
+            if "platform_profile" in available:
+                return "platform_profile"
+        return available[0] if available else "none"
+
+    def _selected_power_key(self) -> str:
+        data = self.power_combo.currentData()
+        if isinstance(data, str) and data:
+            return data
+        return self.settings.value("Power", "USTT_Balanced")
+
+    def _detect_power_backend(self):
+        mode = self._resolved_backend_mode()
+        if mode == "acpi":
+            return self.tr("power_backend_acpi")
+        if mode == "platform_profile":
+            return self.tr("power_backend_platform_profile")
+        return self.tr("power_backend_none")
+
+    def _current_backend_mode(self):
+        return self._resolved_backend_mode()
+
     def _init_fan_power_page(self):
         fan_page = self.window.findChild(QWidget, "bfancontrol")
         if not fan_page:
             return
 
         # Stop any existing sensor poller before rebuilding
-        if hasattr(self, "_sensor_poller"):
-            self._sensor_poller.stop()
-            del self._sensor_poller
+        self._stop_sensor_poller()
 
         root_layout = fan_page.layout()
         if root_layout is None:
@@ -51,9 +112,15 @@ class FanMixin:
         pr = QHBoxLayout(power_row); pr.setContentsMargins(0, 0, 0, 0)
         pr.addWidget(QLabel(self.tr("power_mode_label")))
         self.power_combo = QComboBox(power_row)
-        self.power_combo.addItems(list(self.power_modes_dict.keys()))
-        self.power_combo.setCurrentText(self.settings.value("Power", "USTT_Balanced"))
+        for mode_key in self.power_modes_dict.keys():
+            self.power_combo.addItem(self._power_mode_label(mode_key), mode_key)
+        current_key = self.settings.value("Power", "USTT_Balanced")
+        idx = self.power_combo.findData(current_key)
+        self.power_combo.setCurrentIndex(0 if idx < 0 else idx)
         pr.addWidget(self.power_combo, 1)
+        self.apply_power_btn = QPushButton(self.tr("apply_power_profile"), power_row)
+        self.apply_power_btn.clicked.connect(self._apply_power_profile)
+        pr.addWidget(self.apply_power_btn)
         main_vbox.addWidget(power_row)
 
         fan_hbox = QHBoxLayout()
@@ -95,6 +162,12 @@ class FanMixin:
         self.fan_info = QLabel("", group)
         self.fan_info.setWordWrap(True)
         main_vbox.addWidget(self.fan_info)
+        self.power_backend_label = QLabel("", group)
+        self.power_backend_label.setWordWrap(True)
+        main_vbox.addWidget(self.power_backend_label)
+        self.power_backend_btn = QPushButton(self.tr("switch_power_backend"), group)
+        self.power_backend_btn.clicked.connect(self._switch_power_backend)
+        main_vbox.addWidget(self.power_backend_btn)
 
         root_layout.addWidget(group)
 
@@ -107,6 +180,9 @@ class FanMixin:
         self._sensor_poller = SensorPoller(interval_ms=1000, parent=self.window)
         self._sensor_poller.data_ready.connect(self._update_sensor_ui)
         self._sensor_poller.start()
+
+        backend = self._detect_power_backend()
+        self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
 
         if not (getattr(self, "is_root", False) and self.is_dell_g_series):
             self.fan_info.setText(self.tr("fan_root_warn"))
@@ -129,31 +205,115 @@ class FanMixin:
     def _on_power_changed(self):
         self.fan1_slider.setValue(0)
         self.fan2_slider.setValue(0)
-        self.settings.setValue("Power", self.power_combo.currentText())
-        is_manual = self.power_combo.currentText() == "Manual"
+        selected_key = self._selected_power_key()
+        self.settings.setValue("Power", selected_key)
+        is_manual = selected_key == "Manual"
         self.fan1_slider.setEnabled(is_manual)
         self.fan2_slider.setEnabled(is_manual)
         if not is_manual:
             self.fan_info.setText(self.tr("fan_manual_info"))
+        backend = self._detect_power_backend()
+        self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
+
+    def _apply_power_profile(self):
+        message = self._apply_power_profile_message()
+        backend = self._detect_power_backend()
+        self.fan_info.setText(f"{message}\n{self.tr('power_backend_current', backend=backend)}")
+
+    def _apply_power_profile_message(self) -> str:
+        backend_mode = self._current_backend_mode()
+        choice = self._selected_power_key()
+        self.settings.setValue("Power", choice)
+        choice_label = self._power_mode_label(choice)
+
+        if backend_mode == "acpi":
+            if not self._acpi_backend_available():
+                return self.tr("fan_root_warn")
+            mode = self.power_modes_dict[choice]
+            self.acpi_call("set_power_mode", mode)
+            result = self.acpi_call("get_power_mode")
+            message = (
+                f"Power mode set to {choice_label}.\n"
+                if result == mode
+                else f"Error! Command returned: {result}, but expecting {mode}.\n"
+            )
+            result_g = self.acpi_call("get_G_mode")
+            if (choice == "G Mode") != (result_g == "0x1"):
+                result_toggle = self.acpi_call("toggle_G_mode")
+                expected = "0x1" if choice == "G Mode" else "0x0"
+                if expected != result_toggle:
+                    message += f"Expected G Mode = {choice == 'G Mode'} but read {result_toggle}!\n"
+        elif backend_mode == "platform_profile":
+            message = self._set_platform_profile(choice)
+        else:
+            message = self.tr("power_backend_none")
+
+        return message
+
+    def _set_platform_profile(self, choice: str) -> str:
+        profile_path = "/sys/firmware/acpi/platform_profile"
+        if not os.path.exists(profile_path):
+            return self.tr("power_backend_none")
+
+        mapping = {
+            "USTT_Balanced": "balanced",
+            "USTT_Performance": "performance",
+            "USTT_Quiet": "quiet",
+            "USTT_FullSpeed": "performance",
+            "USTT_BatterySaver": "low-power",
+            "G Mode": "performance",
+            "Manual": "balanced",
+        }
+        profile = mapping.get(choice, "balanced")
+        choice_label = self._power_mode_label(choice)
+        try:
+            with open(profile_path, "w", encoding="utf-8") as f:
+                f.write(profile)
+            return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
+        except OSError:
+            # Fallback through root shell if available.
+            if getattr(self, "is_root", False):
+                try:
+                    self.shell_exec(f"echo {profile} > {profile_path}")
+                    return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
+                except Exception:
+                    pass
+            # Last fallback: explicit pkexec call on demand.
+            try:
+                subprocess.run(
+                    ["pkexec", "sh", "-c", f"echo {profile} > {profile_path}"],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
+            except Exception:
+                pass
+            return self.tr("power_backend_apply_fail", mode=choice_label, mapped=profile)
+
+    def _switch_power_backend(self):
+        available = self._available_backend_modes()
+        if not available:
+            backend = self._detect_power_backend()
+            self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
+            self.fan_info.setText(self.tr("power_backend_switch_unavailable"))
             return
-        if not (getattr(self, "is_root", False) and self.is_dell_g_series):
-            return
-        choice = self.settings.value("Power", "USTT_Balanced")
-        mode = self.power_modes_dict[choice]
-        self.acpi_call("set_power_mode", mode)
-        result = self.acpi_call("get_power_mode")
-        message = (
-            f"Power mode set to {choice}.\n"
-            if result == mode
-            else f"Error! Command returned: {result}, but expecting {mode}.\n"
+
+        current = self._current_backend_mode()
+        if current in available:
+            current_index = available.index(current)
+            new_mode = available[(current_index + 1) % len(available)]
+        else:
+            new_mode = available[0]
+
+        self.settings.setValue("PowerBackend", new_mode)
+
+        backend = self._detect_power_backend()
+        self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
+        apply_message = self._apply_power_profile_message()
+        self.fan_info.setText(
+            f"{self.tr('power_backend_switched', backend=backend)}\n{apply_message}"
         )
-        result_g = self.acpi_call("get_G_mode")
-        if (choice == "G Mode") != (result_g == "0x1"):
-            result_toggle = self.acpi_call("toggle_G_mode")
-            expected = "0x1" if choice == "G Mode" else "0x0"
-            if expected != result_toggle:
-                message += f"Expected G Mode = {choice == 'G Mode'} but read {result_toggle}!\n"
-        self.fan_info.setText(message)
 
     def _on_fan_boost(self, which: int):
         if not (getattr(self, "is_root", False) and self.is_dell_g_series):

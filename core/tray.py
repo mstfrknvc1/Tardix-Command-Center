@@ -10,8 +10,4 @@ class TrayIcon(QSystemTrayIcon):
     def _on_activated(self, reason):
         if reason != QSystemTrayIcon.ActivationReason.Trigger:
             return
-        # Sol tık: led toggle
-        if self.app.settings.value("State", "Off") == "Off":
-            self.app.tray_on()
-        else:
-            self.app.tray_off()
+        self.app.toggle_led_state(source="tray")

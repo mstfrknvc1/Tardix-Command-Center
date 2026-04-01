@@ -2,8 +2,6 @@
 
 Tardix'a katkı sağladığınız için teşekkürler! Bu belge, projede hata düzeltme, yeni özellik ekleme veya yapı iyileştirmelerine nasıl katkı sağlayacağınızı açıklar.
 
----
-
 ## Hızlı Başlangıç
 
 ### 1. Ortam Hazırlığı
@@ -14,12 +12,14 @@ git clone https://github.com/sizin-kullanıcıadı/Tardix-Command-Center.git
 cd Tardix-Command-Center
 
 # Python virtual environment
-python3 -m venv tcc
-source tcc/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Bağımlılıkları yükleyin
 pip install -r requirements.txt
 ```
+
+Not: Paketleme ve masaüstü entegrasyonu `setup.sh` üzerinden test edilir. Geliştirme için repodan doğrudan çalışma yeterlidir.
 
 ### 2. Çalıştırma & Test Etme
 
@@ -28,20 +28,22 @@ pip install -r requirements.txt
 python3 main.py
 
 # Sözdizimi kontrol edin
-python3 -m py_compile core/*.py hardware/*.py widgets/*.py pages/*.py
+python3 -m py_compile main.py core/*.py hardware/*.py widgets/*.py pages/*.py
+
+# Widget test/demosu
+python3 -m tests.test_widgets
+```
+
+Kurulum betiği değiştiyse ayrıca şunu çalıştırın:
+
+```bash
+bash -n setup.sh
+bash -n uninstall.sh
 ```
 
 ### 3. Değişiklik Yapın & Pull Request
 
-```bash
-git checkout -b feature/your-feature-name
-# ... (kodunuzu değiştirin) ...
-git add .
-git commit -m "Feature: Açıklama (Title)" -m "Detaylı açıklama (Body)"
-git push origin feature/your-feature-name
-```
-
----
+Değişiklikleriniz metadata, kurulum veya dokümantasyon içeriyorsa `core/app_meta.py`, `setup.sh`, `README.md` ve ilgili `.desktop` üretimini birlikte kontrol edin.
 
 ## Proje Yapısı
 

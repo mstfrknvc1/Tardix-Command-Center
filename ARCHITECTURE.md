@@ -1,8 +1,11 @@
 # Tardix Command Center — Proje Mimarisi
 
-Tardix Command Center, Dell G Serisi ve bazı Alienware laptoplar için yazılmış bir Python/PySide6 kontrol paneli uygulamasıdır. Klavye arka aydınlatması, güç modu ve fan hızı yönetimi sağlar.
+Tardix Command Center, Dell G serisi ve bazı Alienware sistemleri için geliştirilen bir Python/PySide6 kontrol panelidir. RGB aydınlatma, güç modu, fan davranışı ve sensör görünürlüğü sağlar.
 
----
+## Metadata
+
+- Uygulama adı, CLI adı, sürüm ve masaüstü metadata sabitleri `core/app_meta.py` içinde tutulur.
+- `main.py`, `setup.sh`, info sayfası ve autostart `.desktop` girdisi bu merkezi kaynağı kullanır.
 
 ## Dizin Yapısı
 
@@ -11,8 +14,10 @@ Tardix-Command-Center/
 │
 ├── main.py                  ← Uygulama giriş noktası; TardixApp sınıfı + main()
 ├── main.ui                  ← Qt Designer UI tanımı (kenar çubuğu + sayfa iskeletleri)
-├── requirements.txt         ← Python bağımlılıkları (PySide6, pexpect, pyusb)
+├── requirements.txt         ← Python bağımlılıkları (PySide6, pexpect, pyusb, psutil)
 ├── 00-aw-elc.rules          ← udev kuralı (USB LED cihazı izinleri)
+├── setup.sh                 ← XDG kullanıcı kurulumu ve launcher üretimi
+├── uninstall.sh             ← Kurulu veya legacy dosyaları kaldırma betiği
 ├── README.md
 ├── LICENSE.md
 ├── ARCHITECTURE.md          ← Bu dosya
@@ -81,6 +86,7 @@ main.py
     │
     ├── UI yükleme: main.ui (QUiLoader)
     ├── Çeviri: core/i18n.py → TRANSLATIONS
+    ├── Metadata: core/app_meta.py
     ├── Ayarlar: QSettings("Tardix", "CommandCenter")
     └── Donanım erişimi:
         ├── hardware/awelc.py  ← USB LED (pyusb)
@@ -107,23 +113,26 @@ Dil değiştiğinde `SettingsMixin._on_language_changed_handler()` tüm 6 sayfay
 | Paket | Kullanım | Zorunlu |
 |-------|----------|---------|
 | PySide6 | Tüm UI | ✅ |
-| pexpect | ACPI/pkexec kabuk | ⚠️ (opsiyonel) |
-| pyusb | USB LED kontrolü | ⚠️ (opsiyonel) |
+| psutil | Sensör ve sistem bilgisi | ✅ |
+| pexpect | ACPI/pkexec kabuk | ⚠️ |
+| pyusb | USB LED kontrolü | ⚠️ |
 
 Opsiyonel bağımlılıklar eksikse uygulama açılmaya devam eder; ilgili özellikler devre dışı kalır.
-
----
 
 ## Kurulum
 
 ```bash
-# udev kuralını kopyala
-sudo cp 00-aw-elc.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
+./setup.sh
+```
 
-# Bağımlılıkları kur
-pip install -r requirements.txt
+Kurulum sonrası varsayılan çalışma şekli:
 
-# Çalıştır
+```bash
+tcc
+```
+
+Geliştirme sırasında repodan doğrudan çalıştırmak için:
+
+```bash
 python3 main.py
 ```
