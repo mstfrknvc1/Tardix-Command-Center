@@ -1,0 +1,135 @@
+try:
+    import pexpect  # type: ignore
+except ModuleNotFoundError:
+    pexpect = None
+
+from .patch import (
+    g15_5511_patch,
+    g15_5515_patch,
+    g15_5520_patch,
+    g15_5530_patch,
+    g16_7630_patch,
+)
+
+
+class ACPIMixin:
+    """ACPI/hardware control and laptop model detection."""
+
+    def init_acpi_call(self):
+        if pexpect is None:
+            self.is_root = False
+            self.is_dell_g_series = False
+            return
+
+        self.acpi_call_dict = {
+            "get_laptop_model": ["0x1a", "0x02", "0x02"],
+            "get_power_mode":   ["0x14", "0x0b", "0x00"],
+            "set_power_mode":   ["0x15", "0x01"],
+            "toggle_G_mode":    ["0x25", "0x01"],
+            "get_G_mode":       ["0x25", "0x02"],
+            "set_fan1_boost":   ["0x15", "0x02", "0x32"],
+            "get_fan1_boost":   ["0x14", "0x0c", "0x32"],
+            "get_fan1_rpm":     ["0x14", "0x05", "0x32"],
+            "get_cpu_temp":     ["0x14", "0x04", "0x01"],
+            "set_fan2_boost":   ["0x15", "0x02", "0x33"],
+            "get_fan2_boost":   ["0x14", "0x0c", "0x33"],
+            "get_fan2_rpm":     ["0x14", "0x05", "0x33"],
+            "get_gpu_temp":     ["0x14", "0x04", "0x06"],
+        }
+
+        self.is_root = False
+        try:
+            self.shell = pexpect.spawn(
+                "bash",
+                encoding="utf-8",
+                logfile=self.logfile,
+                env=None,
+                args=["--noprofile", "--norc"],
+            )
+            self.shell.expect("[#$] ")
+            self.shell_exec(" export HISTFILE=/dev/null; history -c")
+            self.shell_exec("pkexec bash --noprofile --norc")
+            self.shell_exec(" export HISTFILE=/dev/null; history -c")
+            self.is_root = self.shell_exec("whoami")[1].find("root") != -1
+            if not self.is_root:
+                return
+        except Exception:
+            return
+
+        self._check_laptop_model()
+
+    def _check_laptop_model(self):
+        # Intel
+        self.acpi_cmd = (
+            'echo "\\\\_SB.AMWW.WMAX 0 {} {{{}, {}, {}, 0x00}}"'
+            " | tee /proc/acpi/call; cat /proc/acpi/call"
+        )
+        laptop_model = self.acpi_call("get_laptop_model")
+
+        if laptop_model == "0x0":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = True
+            self.model = "G15 5530"
+            g15_5530_patch(self)
+            return
+
+        if laptop_model == "0x12c0":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = True
+            self.model = "G15 5520"
+            g15_5520_patch(self)
+            return
+
+        if laptop_model == "0xc80":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = True
+            self.model = "G15 5511"
+            g15_5511_patch(self)
+            return
+
+        # G16 7630 check (orijinal davranış korunuyor)
+        if laptop_model == "0x0":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = False
+            self.model = "G16 7630"
+            g16_7630_patch(self)
+            return
+
+        # AMD
+        self.acpi_cmd = (
+            'echo "\\\\_SB.AMW3.WMAX 0 {} {{{}, {}, {}, 0x00}}"'
+            " | tee /proc/acpi/call; cat /proc/acpi/call"
+        )
+        laptop_model = self.acpi_call("get_laptop_model")
+
+        if laptop_model == "0x12c0":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = True
+            self.model = "G15 5525"
+            return
+
+        if laptop_model == "0xc80":
+            self.is_dell_g_series = True
+            self.is_keyboard_supported = True
+            self.model = "G15 5515"
+            g15_5515_patch(self)
+
+    def acpi_call(self, cmd, arg1="0x00", arg2="0x00"):
+        args = self.acpi_call_dict[cmd]
+        if len(args) == 4:
+            cmd_current = self.acpi_cmd.format(args[0], args[1], args[2], args[3])
+        elif len(args) == 3:
+            cmd_current = self.acpi_cmd.format(args[0], args[1], args[2], arg1)
+        elif len(args) == 2:
+            cmd_current = self.acpi_cmd.format(args[0], args[1], arg1, arg2)
+        else:
+            cmd_current = ""
+        return self.parse_shell_exec(self.shell_exec(cmd_current)[2])
+
+    def shell_exec(self, cmd: str):
+        self.shell.sendline(cmd)
+        self.shell.expect("[#$] ")
+        return self.shell.before.split("\n")
+
+    def parse_shell_exec(self, line: str):
+        return line[line.find("\r") + 1 : line.find("\x00")]
