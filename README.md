@@ -1,4 +1,4 @@
-# Tardix Command Center
+# Tardix Command Center ![Version](https://img.shields.io/badge/version-0.7.0--beta.1-blue)
 
 Modern Linux control panel for supported Dell G-series and Alienware systems.
 
@@ -6,7 +6,7 @@ This project is a fork and continuation of:
 - https://github.com/cemkaya-mpi/Dell-G-Series-Controller
 
 ## What It Does
-- Keyboard RGB control (Static, Morph, Color and Morph, Off)
+- Keyboard RGB control (Static, Morph, RGB Cycle, Dual Morph, Windows Setting, Off)
 - Power mode controls (ACPI or platform_profile backend)
 - Fan boost controls (supported models and permissions required)
 - Live CPU/GPU temperature and RPM monitoring

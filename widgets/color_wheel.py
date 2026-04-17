@@ -131,11 +131,14 @@ class ColorWheel(QWidget):
         self.canvas.setBrightness(1.0)
 
     def setColor(self, color: QColor):
-        """Set the color wheel to display a specific QColor"""
+        """Set the color wheel to display a specific QColor.
+
+        Only updates the visual position of the selector — does NOT emit
+        colorChanged. Signal fires only on user mouse interaction.
+        """
         h, s, v, a = color.getHsvF()
         if h < 0:  # -1 means achromatic
             h = 0
         self.canvas.hue = h
         self.canvas.saturation = s
-        self.canvas.emitColor()
         self.canvas.update()

@@ -1,4 +1,5 @@
 import os
+import re
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -105,22 +106,46 @@ class SettingsMixin:
 
     def _apply_turbo_boost(self, disable: bool):
         """Write to sysfs to enable/disable CPU Turbo Boost (requires root)."""
+        print(f"[TURBO BOOST] İstek: {'Devre dışı bırak' if disable else 'Etkinleştir'}")
         if not getattr(self, "is_root", False):
+            print("[TURBO BOOST] HATA: Root yetkisi yok!")
             return
         intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
         amd_path = "/sys/devices/system/cpu/cpufreq/boost"
         try:
-            probe = self.shell_exec(
-                f"[ -f {intel_path} ] && echo intel "
-                f"|| ([ -f {amd_path} ] && echo amd || echo none)"
-            )
-            cpu_type = probe[1].strip() if len(probe) > 1 else "none"
+            # Debug: tüm çıktıyı gör
+            probe_cmd = f"if [ -f {intel_path} ]; then echo intel; elif [ -f {amd_path} ]; then echo amd; else echo none; fi"
+            print(f"[TURBO BOOST] Komut: {probe_cmd}")
+            probe = self.shell_exec(probe_cmd)
+            print(f"[TURBO BOOST] Raw çıktı: {probe}")
+            # Son satırı al (çıktı genellikle son satırda)
+            cpu_type = "none"
+            for line in probe:
+                # Escape karakterlerini ve whitespace'i temizle
+                line = line.replace('\r', '').replace('\n', '').strip()
+                # ANSI escape karakterlerini temizle
+                line = re.sub(r'\x1b\[[?0-9]*[hl]', '', line)
+                if line in ["intel", "amd", "none"]:
+                    cpu_type = line
+                    break
+            print(f"[TURBO BOOST] CPU tipi: {cpu_type}")
             if cpu_type == "intel":
-                self.shell_exec(f"echo {'1' if disable else '0'} > {intel_path}")
+                print(f"[TURBO BOOST] Intel yolu: {intel_path}")
+                value = '1' if disable else '0'
+                # Try direct file write with sudo
+                result = self.shell_exec(f"sudo bash -c 'echo {value} > {intel_path}'")
+                print(f"[TURBO BOOST] Intel sonuç: {result}")
             elif cpu_type == "amd":
-                self.shell_exec(f"echo {'0' if disable else '1'} > {amd_path}")
-        except Exception:
-            pass
+                print(f"[TURBO BOOST] AMD yolu: {amd_path}")
+                value = '0' if disable else '1'
+                result = self.shell_exec(f"sudo bash -c 'echo {value} > {amd_path}'")
+                print(f"[TURBO BOOST] AMD sonuç: {result}")
+            else:
+                print(f"[TURBO BOOST] HATA: Desteklenmeyen CPU tipi: {cpu_type}")
+                print(f"[TURBO BOOST] Intel path var mı: {self.shell_exec(f'ls -la {intel_path}')}")
+                print(f"[TURBO BOOST] AMD path var mı: {self.shell_exec(f'ls -la {amd_path}')}")
+        except Exception as err:
+            print(f"[TURBO BOOST] HATA: {err.__class__.__name__}: {err}")
 
     def _on_autostart_toggled(self, enabled: bool):
         autostart_dir = os.path.expanduser("~/.config/autostart")

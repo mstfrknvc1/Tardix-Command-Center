@@ -28,14 +28,14 @@ TRANSLATIONS: dict[str, dict] = {
         "go_rgb":                        "RGB Kontrole Git",
         "go_fan":                        "Fan Kontrole Git",
         "go_settings":                   "Ayarlara Git",
-        "tips_title":                    "İpuçları",
-        "tips_text": (
-            "💡 İpuçları:\n"
-            "• Renk karelerine tıklayarak rengi seç\n"
-            "• RGB sekmesinde parlaklığı ayarla\n"
-            "• Fan hızlarını gerçek zamanlı izle\n"
-            "• Sıcaklık limitlerini akıllıca kullan\n\n"
-            "📖 Daha fazla bilgi için üzerine gel"
+        # ── News widget ───────────────────────────────────────
+        "news_title":      "Oyun & Teknoloji Haberleri",
+        "news_loading":    "⏳ Haberler yükleniyor...",
+        "news_unavailable": "⚠️  Haberler şu an kullanılamıyor (internet bağlantısı gerekli).",
+        "news_disclaimer": (
+            "ⓘ  Bu başlıklar herkese açık RSS akışlarından otomatik olarak alınmaktadır. "
+            "Tüm içerikler ilgili yayıncıların mülküdür. "
+            "Tardix Command Center içeriğin doğruluğundan ya da erişilebilirliğinden sorumlu değildir."
         ),
         # ── RGB page ─────────────────────────────────────────
         "duration": "Süre",
@@ -43,7 +43,9 @@ TRANSLATIONS: dict[str, dict] = {
         "apply":    "Uygula",
         "rgb_mode_static": "Sabit Renk",
         "rgb_mode_morph": "Geçişli",
-        "rgb_mode_color_and_morph": "Renk ve Geçiş",
+        "rgb_mode_rgb": "RGB Döngü",
+        "rgb_mode_dual_morph": "Çift Renk Geçişi",
+        "rgb_mode_windows_setting": "Windows Ayarını Kullan",
         "rgb_mode_off": "Kapalı",
         "rgb_target_static": "Sabit",
         "rgb_target_morph": "Geçiş",
@@ -165,14 +167,14 @@ TRANSLATIONS: dict[str, dict] = {
         "go_rgb":                        "Go to RGB Control",
         "go_fan":                        "Go to Fan Control",
         "go_settings":                   "Go to Settings",
-        "tips_title":                    "Tips & Info",
-        "tips_text": (
-            "💡 Tips:\n"
-            "• Click color swatches to select a target\n"
-            "• Adjust brightness in the RGB tab\n"
-            "• Monitor fan speeds in real-time\n"
-            "• Use temperature limits wisely\n\n"
-            "📖 Hover over elements for more info"
+        # ── News widget ───────────────────────────────────────
+        "news_title":      "Gaming & Technology News",
+        "news_loading":    "⏳ Loading news...",
+        "news_unavailable": "⚠️  News is currently unavailable (internet connection required).",
+        "news_disclaimer": (
+            "ⓘ  Headlines are fetched automatically from publicly available RSS feeds. "
+            "All content remains the property of the respective publishers. "
+            "Tardix Command Center is not responsible for the accuracy or availability of third-party content."
         ),
         # ── RGB page ─────────────────────────────────────────
         "duration": "Duration",
@@ -180,7 +182,9 @@ TRANSLATIONS: dict[str, dict] = {
         "apply":    "Apply",
         "rgb_mode_static": "Static Color",
         "rgb_mode_morph": "Morph",
-        "rgb_mode_color_and_morph": "Color and Morph",
+        "rgb_mode_rgb": "RGB Cycle",
+        "rgb_mode_dual_morph": "Dual Morph",
+        "rgb_mode_windows_setting": "Use Windows Setting",
         "rgb_mode_off": "Off",
         "rgb_target_static": "Static",
         "rgb_target_morph": "Morph",

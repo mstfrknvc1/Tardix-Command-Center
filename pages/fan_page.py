@@ -165,9 +165,6 @@ class FanMixin:
         self.power_backend_label = QLabel("", group)
         self.power_backend_label.setWordWrap(True)
         main_vbox.addWidget(self.power_backend_label)
-        self.power_backend_btn = QPushButton(self.tr("switch_power_backend"), group)
-        self.power_backend_btn.clicked.connect(self._switch_power_backend)
-        main_vbox.addWidget(self.power_backend_btn)
 
         root_layout.addWidget(group)
 
@@ -182,7 +179,11 @@ class FanMixin:
         self._sensor_poller.start()
 
         backend = self._detect_power_backend()
-        self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
+        current_profile = self._platform_profile_current()
+        backend_text = self.tr("power_backend_current", backend=backend)
+        if current_profile:
+            backend_text += f"  (active profile: {current_profile})"
+        self.power_backend_label.setText(backend_text)
 
         if not (getattr(self, "is_root", False) and self.is_dell_g_series):
             self.fan_info.setText(self.tr("fan_root_warn"))
@@ -203,13 +204,14 @@ class FanMixin:
         return slider, current
 
     def _on_power_changed(self):
-        self.fan1_slider.setValue(0)
-        self.fan2_slider.setValue(0)
         selected_key = self._selected_power_key()
         self.settings.setValue("Power", selected_key)
         is_manual = selected_key == "Manual"
         self.fan1_slider.setEnabled(is_manual)
         self.fan2_slider.setEnabled(is_manual)
+        if is_manual:
+            self.fan1_slider.setValue(int(self.settings.value("Fan1 Boost", 0x00)))
+            self.fan2_slider.setValue(int(self.settings.value("Fan2 Boost", 0x00)))
         if not is_manual:
             self.fan_info.setText(self.tr("fan_manual_info"))
         backend = self._detect_power_backend()
@@ -250,70 +252,79 @@ class FanMixin:
 
         return message
 
+    def _platform_profile_choices(self) -> list[str]:
+        """Return list of profiles supported by the running kernel."""
+        choices_path = "/sys/firmware/acpi/platform_profile_choices"
+        try:
+            with open(choices_path, encoding="utf-8") as f:
+                return f.read().strip().split()
+        except OSError:
+            return ["balanced", "performance", "low-power", "quiet"]
+
+    def _platform_profile_current(self) -> str | None:
+        """Return the currently active platform_profile, or None."""
+        try:
+            with open("/sys/firmware/acpi/platform_profile", encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            return None
+
     def _set_platform_profile(self, choice: str) -> str:
         profile_path = "/sys/firmware/acpi/platform_profile"
         if not os.path.exists(profile_path):
             return self.tr("power_backend_none")
 
         mapping = {
-            "USTT_Balanced": "balanced",
-            "USTT_Performance": "performance",
-            "USTT_Quiet": "quiet",
-            "USTT_FullSpeed": "performance",
+            "USTT_Balanced":     "balanced",
+            "USTT_Performance":  "performance",
+            "USTT_Quiet":        "quiet",
+            "USTT_FullSpeed":    "performance",
             "USTT_BatterySaver": "low-power",
-            "G Mode": "performance",
-            "Manual": "balanced",
+            "G Mode":            "performance",
+            "Manual":            "balanced",
         }
-        profile = mapping.get(choice, "balanced")
+        desired = mapping.get(choice, "balanced")
         choice_label = self._power_mode_label(choice)
-        try:
-            with open(profile_path, "w", encoding="utf-8") as f:
-                f.write(profile)
-            return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
-        except OSError:
-            # Fallback through root shell if available.
-            if getattr(self, "is_root", False):
-                try:
-                    self.shell_exec(f"echo {profile} > {profile_path}")
-                    return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
-                except Exception:
-                    pass
-            # Last fallback: explicit pkexec call on demand.
+
+        # If kernel doesn't support the requested profile, use nearest available.
+        supported = self._platform_profile_choices()
+        profile = desired if desired in supported else (
+            "balanced" if "balanced" in supported else (supported[0] if supported else desired)
+        )
+
+        def _try_write(path: str, value: str) -> bool:
             try:
-                subprocess.run(
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(value)
+                return True
+            except OSError:
+                return False
+
+        ok = _try_write(profile_path, profile)
+        if not ok:
+            # pkexec fallback (prompts user for password once)
+            try:
+                result = subprocess.run(
                     ["pkexec", "sh", "-c", f"echo {profile} > {profile_path}"],
                     check=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
+                    timeout=30,
                 )
-                return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
+                ok = True
             except Exception:
-                pass
+                ok = False
+
+        if not ok:
             return self.tr("power_backend_apply_fail", mode=choice_label, mapped=profile)
 
-    def _switch_power_backend(self):
-        available = self._available_backend_modes()
-        if not available:
-            backend = self._detect_power_backend()
-            self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
-            self.fan_info.setText(self.tr("power_backend_switch_unavailable"))
-            return
+        # Verify by reading back
+        actual = self._platform_profile_current() or ""
+        if actual == profile:
+            return self.tr("power_backend_apply_ok", mode=choice_label, mapped=profile)
+        # Wrote without error but read-back differs — report what is active
+        return self.tr("power_backend_apply_ok", mode=choice_label, mapped=actual or profile)
 
-        current = self._current_backend_mode()
-        if current in available:
-            current_index = available.index(current)
-            new_mode = available[(current_index + 1) % len(available)]
-        else:
-            new_mode = available[0]
-
-        self.settings.setValue("PowerBackend", new_mode)
-
-        backend = self._detect_power_backend()
-        self.power_backend_label.setText(self.tr("power_backend_current", backend=backend))
-        apply_message = self._apply_power_profile_message()
-        self.fan_info.setText(
-            f"{self.tr('power_backend_switched', backend=backend)}\n{apply_message}"
-        )
 
     def _on_fan_boost(self, which: int):
         if not (getattr(self, "is_root", False) and self.is_dell_g_series):

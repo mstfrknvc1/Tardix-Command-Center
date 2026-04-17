@@ -59,7 +59,7 @@ Tüm kullanım yapıları, çeviriler, sensor okuma, ACPI otomasyon, LED kontrol
 | `i18n.py` | Türkçe/İngilizce çeviriler | Yeni dil desteği eklemek |
 | `sensors.py` | psutil tabanlı sensor polling (QThread-safe) | Yeni sensor okuma fonksiyonu |
 | `acpi.py` | ACPI shell arayüzü | Yeni güç modu komutu |
-| `led_control.py` | RGB LED protokol mantığı | Morph modunu değiştirmek |
+| `led_control.py` | RGB LED protokol mantığı | RGB modlarını değiştirmek |
 | `patch.py` | Model-bazlı patch'ler | Yeni laptop modelinin ACPI komutları |
 | `tray.py` | Sistem tray ikon | Tray menüsünü özelleştirmek |
 
@@ -69,7 +69,7 @@ Alienware 187c:0550 USB cihazla iletişim:
 
 | Dosya | Amaç | Örnek Ekleme |
 |-------|------|-----------|
-| `awelc.py` | Üst düzey LED API (`apply_static()`, `apply_morph()`) | Yeni animasyon modu |
+| `awelc.py` | Üst düzey LED API (`set_static()`, `set_morph()`, `set_rgb()`, `set_dual_morph()`) | Yeni animasyon modu |
 | `elc.py` | ELC protokol implementasyon | Protokol komutu değiştirmek |
 | `elc_constants.py` | Sabit değerler | İzin verilen HID report türleri |
 | `hidreport.py` | `usb_control_msg` wrapper | USB işletim komutu |

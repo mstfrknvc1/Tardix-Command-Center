@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ID="tardix-command-center"
+# ── metadata ────────────────────────────────────────────────
+SCRIPT_DIR="/home/mstfrknvc/Belgeler/GitHub/Tardix-Command-Center"
+source "/home/mstfrknvc/Belgeler/GitHub/Tardix-Command-Center/core/app_meta.sh"
 INSTALL_DIR="/home/mstfrknvc/.local/share/tardix-command-center"
 LAUNCHER="/home/mstfrknvc/.local/bin/tcc"
 DESKTOP_FILE="/home/mstfrknvc/.local/share/applications/tardix-command-center.desktop"
@@ -35,6 +36,12 @@ if [ -f /etc/udev/rules.d/00-aw-elc.rules ]; then
     sudo rm -f /etc/udev/rules.d/00-aw-elc.rules
     sudo udevadm control --reload-rules
     sudo udevadm trigger
+fi
+
+if [ -f /etc/systemd/system/tardix-command-center.service ]; then
+    sudo systemctl disable tardix-command-center.service
+    sudo rm -f /etc/systemd/system/tardix-command-center.service
+    sudo systemctl daemon-reload
 fi
 
 if [ -f /etc/polkit-1/rules.d/50-tardix.rules ]; then

@@ -34,3 +34,21 @@ Behavior may differ by kernel and firmware.
 
 ## Responsibility Boundary
 The maintainers and contributors are not liable for any direct, indirect, incidental, special, exemplary, or consequential damages arising from use of this software.
+
+## Third-Party News Content
+The home screen of this application may display headlines fetched from publicly
+available RSS feeds (including but not limited to Phoronix, Hacker News via
+hnrss.org, Linux.com, Rock Paper Shotgun, and Eurogamer).
+
+- Only article titles and links are fetched and displayed.  No full article
+  bodies are cached, reproduced, or redistributed.
+- All displayed content remains the exclusive intellectual property of the
+  respective original publishers.
+- Tardix Command Center makes no representation as to the accuracy,
+  completeness, legality, or availability of any third-party content.
+- The maintainers accept no responsibility for content published by
+  third-party sources.
+- This feature requires an active internet connection and may be subject to
+  the terms of service of each individual RSS provider.
+- If you are a publisher and wish your feed to be removed, please open an
+  issue at the project repository.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Tardix Command Center
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/bash -c 'if [ -f /sys/devices/system/cpu/intel_pstate/no_turbo ]; then chmod 666 /sys/devices/system/cpu/intel_pstate/no_turbo; fi'
+ExecStart=/usr/bin/env python3 %h/.local/share/tardix-command-center/main.py
+WorkingDirectory=%h/.local/share/tardix-command-center
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/%u
+
+[Install]
+WantedBy=graphical-session.target

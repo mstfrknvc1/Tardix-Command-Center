@@ -166,6 +166,8 @@ class Elc:
 		raise Exception("Not implemented in this code at this time")
 
 	def __init__(self,vid,pid,debug=0):
+		self.vid=vid
+		self.pid=pid
 		self.device=usb.core.find(idVendor=vid, idProduct=pid)
 		self.debug=debug
 		

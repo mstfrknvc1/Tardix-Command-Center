@@ -120,9 +120,19 @@ setup_venv() {
         python3 -m venv "$VENV_DIR"
     fi
 
-    "$VENV_DIR/bin/pip" install --upgrade pip
-    "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt"
-    "$VENV_DIR/bin/pip" install pyusb pyinstaller
+    # Ensure pip is available in the virtual environment
+    "$VENV_DIR/bin/python3" -m pip install --upgrade pip
+    
+    # Use pip3 if pip doesn't exist
+    if [ -f "$VENV_DIR/bin/pip" ]; then
+        "$VENV_DIR/bin/pip" install --upgrade pip
+        "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt"
+        "$VENV_DIR/bin/pip" install pyusb pyinstaller
+    else
+        "$VENV_DIR/bin/pip3" install --upgrade pip
+        "$VENV_DIR/bin/pip3" install -r "$APP_DIR/requirements.txt"
+        "$VENV_DIR/bin/pip3" install pyusb pyinstaller
+    fi
 
     # Fast sanity compile for project sources only.
     "$VENV_DIR/bin/python3" -m compileall -q \
@@ -157,6 +167,14 @@ install_udev() {
     sudo cp "$SCRIPT_DIR/00-aw-elc.rules" /etc/udev/rules.d/
     sudo udevadm control --reload-rules
     sudo udevadm trigger
+}
+
+install_systemd_service() {
+    step "Installing systemd service"
+    sudo mkdir -p /etc/systemd/system
+    sudo cp "$SCRIPT_DIR/systemd/tardix-command-center.service" /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable tardix-command-center.service
 }
 
 setup_acpi() {
@@ -265,12 +283,15 @@ Wants=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=$LAUNCHER
+ExecStart=/usr/bin/env python3 %h/.local/share/tardix-command-center/main.py
+WorkingDirectory=%h/.local/share/tardix-command-center
 Restart=on-failure
 RestartSec=3
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/%u
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 EOF
 
     if has_cmd systemctl; then
@@ -312,6 +333,12 @@ if [ -f /etc/udev/rules.d/00-aw-elc.rules ]; then
   sudo udevadm trigger
 fi
 
+if [ -f /etc/systemd/system/tardix-command-center.service ]; then
+  sudo systemctl disable tardix-command-center.service
+  sudo rm -f /etc/systemd/system/tardix-command-center.service
+  sudo systemctl daemon-reload
+fi
+
 if [ -f /etc/polkit-1/rules.d/50-tardix.rules ]; then
   sudo rm -f /etc/polkit-1/rules.d/50-tardix.rules
 fi
@@ -328,8 +355,9 @@ EOF
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-APP_ID="$APP_ID"
+# ── metadata ────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/core/app_meta.sh"
 INSTALL_DIR="$INSTALL_DIR"
 LAUNCHER="$LAUNCHER"
 DESKTOP_FILE="$DESKTOP_FILE"
@@ -362,6 +390,12 @@ if [ -f /etc/udev/rules.d/00-aw-elc.rules ]; then
     sudo rm -f /etc/udev/rules.d/00-aw-elc.rules
     sudo udevadm control --reload-rules
     sudo udevadm trigger
+fi
+
+if [ -f /etc/systemd/system/tardix-command-center.service ]; then
+    sudo systemctl disable tardix-command-center.service
+    sudo rm -f /etc/systemd/system/tardix-command-center.service
+    sudo systemctl daemon-reload
 fi
 
 if [ -f /etc/polkit-1/rules.d/50-tardix.rules ]; then
@@ -409,6 +443,7 @@ main() {
     install_udev
     setup_acpi
     install_polkit
+    install_systemd_service
     build_program
     create_launcher
     create_desktop_files

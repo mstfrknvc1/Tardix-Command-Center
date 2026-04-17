@@ -49,20 +49,41 @@ def apply_action(elc, red, green, blue, duration, tempo, animation=AC_CHARGING, 
         elc.add_action((Action(effect, duration, tempo, red, green, blue),))
         elc.finish_save_animation(animation)
         elc.set_default_animation(animation)
-    else:  # Then, effect is morph.
+    else:  # MORPH: smooth transition from current color to new color
         elc.remove_animation(animation)
         elc.start_new_animation(animation)
         elc.start_series(zones)
-        elc.add_action((Action(MORPH, duration, tempo, red, green, blue), Action(MORPH, duration, tempo, green,
-                       blue, red), Action(MORPH, duration, tempo, blue, red, green)))  # Morph based on given values.
+        
+        # Add intermediate steps for smooth transition
+        steps = 5  # Number of intermediate steps
+        for i in range(steps + 1):
+            # Interpolate between current and target color
+            ratio = i / steps
+            r = int(red * ratio)
+            g = int(green * ratio)
+            b = int(blue * ratio)
+            
+            # Add transition step
+            elc.add_action((
+                Action(MORPH, duration // steps, tempo, r, g, b),
+            ))
+        
         elc.finish_save_animation(animation)
         elc.set_default_animation(animation)
+        
+        # Ensure final color is set as static after morph completes
+        elc.add_action((
+            Action(COLOR, 100, tempo, red, green, blue),
+        ))
 
 def apply_action_color_and_morph(elc, red, green, blue, red_morph, green_morph, blue_morph, duration, tempo, animation=AC_CHARGING):
     elc.remove_animation(animation)
     elc.start_new_animation(animation)
     elc.start_series(ZONES_NP)
-    elc.add_action((Action(MORPH, duration, tempo, red_morph, green_morph, blue_morph),Action(MORPH, duration, tempo, green_morph, blue_morph, red_morph),Action(MORPH, duration, tempo, blue_morph, red_morph, green_morph)))
+    elc.add_action((
+        Action(MORPH, duration, tempo, red_morph, green_morph, blue_morph),
+        Action(MORPH, duration, tempo, 0,         0,           0),
+    ))
     # elc.finish_save_animation(animation)
     
     # elc.start_new_animation(animation)
@@ -187,4 +208,118 @@ def remove_animation():
 def set_dim(level):
     elc, device = init_device()
     elc.dim(ZONES,level)
+    device.reset()
+
+def set_dual_morph(static_red, static_green, static_blue, morph_red, morph_green, morph_blue, duration):
+    """
+    Dual color morph: transitions ONLY between two colors (static and morph).
+    Creates a loop: static -> morph -> static -> morph (no black, no other colors).
+    """
+    set_dim(0)
+    elc, device = init_device()
+    
+    # Remove old animations first
+    elc.remove_animation(AC_SLEEP)
+    elc.remove_animation(AC_CHARGED)
+    elc.remove_animation(AC_CHARGING)
+    elc.remove_animation(DC_SLEEP)
+    elc.remove_animation(DC_ON)
+    
+    # AC_CHARGED - Full brightness, loop between two colors only
+    elc.start_new_animation(AC_CHARGED)
+    elc.start_series(ZONES)
+    # Loop: static -> morph -> static (so it cycles back)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, static_red, static_green, static_blue),
+        Action(MORPH, duration, TEMPO_MIN, morph_red, morph_green, morph_blue),
+        Action(MORPH, duration, TEMPO_MIN, static_red, static_green, static_blue),
+    ))
+    elc.finish_save_animation(AC_CHARGED)
+    elc.set_default_animation(AC_CHARGED)
+    
+    # AC_CHARGING - Full brightness, same two-color loop
+    elc.start_new_animation(AC_CHARGING)
+    elc.start_series(ZONES)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, static_red, static_green, static_blue),
+        Action(MORPH, duration, TEMPO_MIN, morph_red, morph_green, morph_blue),
+        Action(MORPH, duration, TEMPO_MIN, static_red, static_green, static_blue),
+    ))
+    elc.finish_save_animation(AC_CHARGING)
+    elc.set_default_animation(AC_CHARGING)
+    
+    # DC_ON - Half brightness on battery, same two-color loop
+    dc_static = (int(static_red/2), int(static_green/2), int(static_blue/2))
+    dc_morph = (int(morph_red/2), int(morph_green/2), int(morph_blue/2))
+    elc.start_new_animation(DC_ON)
+    elc.start_series(ZONES)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, dc_static[0], dc_static[1], dc_static[2]),
+        Action(MORPH, duration, TEMPO_MIN, dc_morph[0], dc_morph[1], dc_morph[2]),
+        Action(MORPH, duration, TEMPO_MIN, dc_static[0], dc_static[1], dc_static[2]),
+    ))
+    elc.finish_save_animation(DC_ON)
+    elc.set_default_animation(DC_ON)
+    
+    # Reset to apply
+    device.reset()
+
+def set_rgb(duration):
+    """
+    RGB Rainbow mode: cycles through 3 main colors slowly.
+    Red -> Green -> Blue -> Red (loop)
+    """
+    set_dim(0)
+    elc, device = init_device()
+    
+    # Remove old animations first
+    elc.remove_animation(AC_SLEEP)
+    elc.remove_animation(AC_CHARGED)
+    elc.remove_animation(AC_CHARGING)
+    elc.remove_animation(DC_SLEEP)
+    elc.remove_animation(DC_ON)
+    
+    # Only 3 main colors to avoid "Too many actions" error
+    # Hardware limit: max 3-4 actions per animation
+    colors = [
+        (255, 0, 0),      # Red
+        (0, 255, 0),      # Green
+        (0, 0, 255),      # Blue
+    ]
+    
+    # AC_CHARGED - Full brightness
+    elc.start_new_animation(AC_CHARGED)
+    elc.start_series(ZONES)
+    # Add 3 actions max (Red -> Green -> Blue)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, 255, 0, 0),      # Red
+        Action(MORPH, duration, TEMPO_MIN, 0, 255, 0),      # Green
+        Action(MORPH, duration, TEMPO_MIN, 0, 0, 255),     # Blue
+    ))
+    elc.finish_save_animation(AC_CHARGED)
+    elc.set_default_animation(AC_CHARGED)
+    
+    # AC_CHARGING - Full brightness
+    elc.start_new_animation(AC_CHARGING)
+    elc.start_series(ZONES)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, 255, 0, 0),      # Red
+        Action(MORPH, duration, TEMPO_MIN, 0, 255, 0),      # Green
+        Action(MORPH, duration, TEMPO_MIN, 0, 0, 255),     # Blue
+    ))
+    elc.finish_save_animation(AC_CHARGING)
+    elc.set_default_animation(AC_CHARGING)
+    
+    # DC_ON - Half brightness on battery
+    elc.start_new_animation(DC_ON)
+    elc.start_series(ZONES)
+    elc.add_action((
+        Action(MORPH, duration, TEMPO_MIN, 127, 0, 0),      # Half Red
+        Action(MORPH, duration, TEMPO_MIN, 0, 127, 0),      # Half Green
+        Action(MORPH, duration, TEMPO_MIN, 0, 0, 127),      # Half Blue
+    ))
+    elc.finish_save_animation(DC_ON)
+    elc.set_default_animation(DC_ON)
+    
+    # Reset to apply
     device.reset()

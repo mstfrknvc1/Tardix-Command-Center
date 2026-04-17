@@ -5,9 +5,29 @@ import sys
 import os
 import traceback
 
+
+def _prefer_local_venv_python():
+    # On PEP 668 distros, system python may not have project deps.
+    if os.environ.get("TCC_SKIP_VENV_REEXEC") == "1":
+        return
+    if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+        return
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    venv_python = os.path.join(script_dir, ".venv", "bin", "python")
+    if not os.path.exists(venv_python):
+        return
+
+    env = os.environ.copy()
+    env["TCC_SKIP_VENV_REEXEC"] = "1"
+    os.execve(venv_python, [venv_python, *sys.argv], env)
+
+
+_prefer_local_venv_python()
+
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QIODevice, QSettings
 from PySide6.QtGui import QAction, QIcon
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
     QApplication,
     QMenu,
@@ -212,12 +232,9 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
                 pass
 
     def _handle_window_close(self, event):
-        if self._start_hidden:
-            self.window.hide()
-            event.ignore()
-            return
-        self._cleanup()
-        event.accept()
+        """Always hide to tray on close; quit only via tray menu."""
+        self.window.hide()
+        event.ignore()
 
     # ──────────────────────────────────────────────────────────
     # Chrome (window title + sidebar tooltips)
@@ -232,6 +249,24 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
         if self.btn_info:     self.btn_info.setToolTip(self.tr("btn_info_tooltip"))
 
 
+def _single_instance_lock(app_name: str) -> QLocalServer | None:
+    """
+    Returns a live QLocalServer that acts as a single-instance lock.
+    Returns None if another instance is already running (caller should exit).
+    """
+    socket = QLocalSocket()
+    socket.connectToServer(app_name)
+    if socket.waitForConnected(200):
+        socket.disconnectFromServer()
+        return None   # another instance is running
+
+    # Remove any stale socket file from a previous crash
+    QLocalServer.removeServer(app_name)
+    server = QLocalServer()
+    server.listen(app_name)
+    return server
+
+
 def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--background", action="store_true")
@@ -244,12 +279,26 @@ def main():
     qt_app.setOrganizationName(APP_ORGANIZATION)
     qt_app.setOrganizationDomain(APP_ORGANIZATION_DOMAIN)
     qt_app.setDesktopFileName(APP_ID)
-    qt_app.setQuitOnLastWindowClosed(not args.background)
+    # Never quit when last window closes – tray keeps app alive.
+    qt_app.setQuitOnLastWindowClosed(False)
+
+    # ── Single-instance guard ──────────────────────────────────────────────
+    _lock = _single_instance_lock(APP_ID)
+    if _lock is None:
+        # Another instance is already running; bring it to front via tray.
+        print(f"{APP_NAME} is already running.", file=sys.stderr)
+        sys.exit(0)
 
     app = TardixApp(start_hidden=args.background)
     icon = app._app_icon()
     if not icon.isNull():
         qt_app.setWindowIcon(icon)
+
+    def _quit():
+        app._cleanup()
+        _lock.close()
+        qt_app.quit()
+
     qt_app.aboutToQuit.connect(app._cleanup)
 
     tray = TrayIcon(app)
@@ -259,14 +308,16 @@ def main():
     tray.setToolTip(APP_NAME)
 
     menu = QMenu()
-    action_show = QAction("Show Window")
-    action_quit = QAction("Quit")
+    action_show = QAction("Göster / Show")
+    action_quit = QAction("Çıkış / Quit")
     menu.addAction(action_show)
+    menu.addSeparator()
     menu.addAction(action_quit)
     tray.setContextMenu(menu)
 
     action_show.triggered.connect(app.window.show)
-    action_quit.triggered.connect(qt_app.quit)
+    action_show.triggered.connect(app.window.raise_)
+    action_quit.triggered.connect(_quit)
 
     sys.exit(qt_app.exec())
 

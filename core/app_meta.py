@@ -8,5 +8,5 @@ APP_ORGANIZATION = "mstfrknvc"
 APP_ORGANIZATION_DOMAIN = "github.com/mstfrknvc"
 
 # SemVer + prerelease tag keeps unstable builds understandable and sortable.
-APP_VERSION = "0.4.0-beta.1"
+APP_VERSION = "0.7.0-beta.1"
 VERSION_SCHEME = "SemVer prerelease (alpha.N, beta.N, rc.N)"

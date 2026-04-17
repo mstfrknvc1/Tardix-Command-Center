@@ -28,7 +28,7 @@ Tardix-Command-Center/
 │   ├── i18n.py              ← Türkçe / English çeviri sözlükleri
 │   ├── patch.py             ← Model bazlı güç modu yamaları (G15/G16)
 │   ├── acpi.py              ← ACPIMixin: ACPI kabuk çağrıları, model tespiti
-│   ├── led_control.py       ← LEDMixin: apply_static/morph/color_and_morph, tray on/off
+│   ├── led_control.py       ← LEDMixin: apply_static/morph/rgb/dual_morph, tray on/off
 │   └── tray.py              ← TrayIcon (QSystemTrayIcon alt sınıfı)
 │
 ├── hardware/                ← USB/HID LED sürücü kütüphanesi

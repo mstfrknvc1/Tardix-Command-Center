@@ -29,7 +29,9 @@ class RGBMixin:
     RGB_MODE_OPTIONS = (
         ("static_color", "rgb_mode_static"),
         ("morph", "rgb_mode_morph"),
-        ("color_and_morph", "rgb_mode_color_and_morph"),
+        ("rgb", "rgb_mode_rgb"),
+        ("dual_morph", "rgb_mode_dual_morph"),
+        ("windows_setting", "rgb_mode_windows_setting"),
         ("off", "rgb_mode_off"),
     )
 
@@ -42,7 +44,9 @@ class RGBMixin:
             "static": "static_color",
             "static_color": "static_color",
             "morph": "morph",
-            "color_and_morph": "color_and_morph",
+            "rgb": "rgb",
+            "dual_morph": "dual_morph",
+            "windows_setting": "windows_setting",
             "off": "off",
         }
         normalized = saved_mode.strip().lower().replace(" ", "_")
@@ -52,7 +56,9 @@ class RGBMixin:
         return {
             "static_color": "Static Color",
             "morph": "Morph",
-            "color_and_morph": "Color and Morph",
+            "rgb": "RGB",
+            "dual_morph": "Dual Morph",
+            "windows_setting": "Windows Setting",
             "off": "Off",
         }.get(mode_key, "Static Color")
 
@@ -231,7 +237,9 @@ class RGBMixin:
             self.rgb_mode.currentTextChanged.connect(self._on_mode_changed)
             self.color_wheel.colorChanged.connect(self._on_color_changed)
             if self.brightness_slider:
-                self.brightness_slider.valueChanged.connect(self._on_dim_changed)
+                # Update label in real-time but only save on release
+                self.brightness_slider.valueChanged.connect(self._on_dim_value_changed)
+                self.brightness_slider.sliderReleased.connect(self._on_dim_save)
 
         self._sync_speed_visibility()
         self._stabilize_rgb_layout()
@@ -246,13 +254,15 @@ class RGBMixin:
         self.settings.setValue("RGB Target", target)
         self._refresh_rgb_labels()
         self._refresh_selected_color_previews()
+        if self.color_wheel:
+            self.color_wheel.setColor(
+                self._rgb_static if target == "Static" else self._rgb_morph
+            )
 
     def _select_color_from_swatch(self, target: str):
         """Select *target* and sync the color wheel to that color."""
         self._set_rgb_target(target)
-        self.color_wheel.setColor(
-            self._rgb_static if target == "Static" else self._rgb_morph
-        )
+        # _set_rgb_target already calls color_wheel.setColor(); no duplicate needed.
 
     def _make_swatch_handler(self, target: str):
         def handler(event):
@@ -290,7 +300,9 @@ class RGBMixin:
         mode = self._rgb_mode_key()
         if mode == "morph":
             tint = self._rgb_morph
-        elif mode == "color_and_morph":
+        elif mode == "rgb":
+            tint = QColor(255, 0, 0)  # Red for RGB mode preview
+        elif mode == "dual_morph":
             tint = QColor(
                 (self._rgb_static.red() + self._rgb_morph.red()) // 2,
                 (self._rgb_static.green() + self._rgb_morph.green()) // 2,
@@ -317,7 +329,7 @@ class RGBMixin:
         self.keyboard_preview.setPixmap(pm)
 
     def _sync_speed_visibility(self):
-        needs_speed = self._rgb_mode_key() in {"morph", "color_and_morph"}
+        needs_speed = self._rgb_mode_key() in {"morph", "rgb", "dual_morph"}
         if hasattr(self, "_duration_row") and self._duration_row:
             self._duration_row.setEnabled(needs_speed)
             self._duration_row.setVisible(True)
@@ -328,6 +340,10 @@ class RGBMixin:
         mode_key = self.rgb_mode.currentData() if self.rgb_mode else None
         if isinstance(mode_key, str) and mode_key:
             self._sync_rgb_mode_settings(mode_key)
+            if mode_key == "morph":
+                self._set_rgb_target("Morph")
+            elif mode_key == "static_color":
+                self._set_rgb_target("Static")
         self._sync_speed_visibility()
         self._update_keyboard_preview_tint()
 
@@ -341,13 +357,20 @@ class RGBMixin:
         self._refresh_rgb_labels()
         self._refresh_selected_color_previews()
 
-    def _on_dim_changed(self, value: int):
+    def _on_dim_value_changed(self, value: int):
+        """Update brightness label in real-time while sliding (no saving)."""
+        if self.brightness_value_label:
+            self.brightness_value_label.setText(f"{value}%")
+
+    def _on_dim_save(self):
+        """Save brightness setting only when slider is released."""
+        if not self.brightness_slider:
+            return
+        value = self.brightness_slider.value()
         # value = brightness (0=off, 100=full); internally stored as dim (inverted)
         actual_dim = 100 - value
         self._rgb_dim = actual_dim
         self.settings.setValue("RGB Dim", actual_dim)
-        if self.brightness_value_label:
-            self.brightness_value_label.setText(f"{value}%")
         if awelc is not None:
             try:
                 awelc.set_dim(actual_dim)
