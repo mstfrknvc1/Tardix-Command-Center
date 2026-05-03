@@ -12,6 +12,20 @@ This project is a fork and continuation of:
 - Live CPU/GPU temperature and RPM monitoring
 - Tray integration, Turkish/English UI, persistent settings
 
+## Screenshots
+
+### Dashboard & News
+The main dashboard provides a quick overview of the system status, power mode, and the latest gaming and technology news fetched via RSS.
+![Dashboard](assets/screenshots/dashboard.png)
+
+### Lighting Control
+Customize your keyboard backlight with various modes and colors using the intuitive lighting control interface.
+![Lighting](assets/screenshots/lighting.png)
+
+### Performance & Fans
+Monitor real-time temperatures and fan speeds, and switch between power profiles to optimize your system's performance.
+![Performance](assets/screenshots/performance.png)
+
 ## New in This Fork
 - Modular architecture (`core`, `pages`, `widgets`, `hardware`)
 - Background sensor polling (smooth UI, less stutter)
