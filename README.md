@@ -1,6 +1,8 @@
 # Tardix Command Center ![Version](https://img.shields.io/badge/version-0.7.0--beta.1-blue)
 
-Modern Linux control panel for supported Dell G-series and Alienware systems.
+**A powerful Alienware Command Center (AWCC) alternative for Linux.**
+
+Tardix Command Center is an advanced control panel for **Dell G-Series** (G15, G16) and **Alienware** laptops on Linux. It provides a modern interface for **RGB lighting control**, **fan speed monitoring**, and **system power profiles**.
 
 This project is a fork and continuation of:
 - https://github.com/cemkaya-mpi/Dell-G-Series-Controller
@@ -41,6 +43,9 @@ Monitor real-time temperatures and fan speeds, and switch between power profiles
 - ACPI power/fan controls are model and firmware dependent.
 - RGB support depends on Alienware LED USB controller availability.
 - Even if model is not listed, RGB may still work if USB controller is present.
+
+### Search Keywords
+`Dell G15 Linux`, `Dell G16 Linux`, `Alienware Command Center Linux`, `AWCC Alternative`, `Linux Fan Control`, `Dell RGB Keyboard Linux`, `Dell Power Profiles Linux`, `G-Series Fan Boost`.
 
 ## Quick Setup
 Run:
