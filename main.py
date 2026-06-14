@@ -163,6 +163,15 @@ class TardixApp(HomeMixin, RGBMixin, FanMixin, SettingsMixin,
         self.is_keyboard_supported = True
         self.model = "Unknown"
         self.timer = None
+        self.power_modes_dict = {
+            "USTT_Balanced":     "0xa0",
+            "USTT_Performance":  "0xa1",
+            "USTT_Quiet":        "0xa3",
+            "USTT_FullSpeed":    "0xa4",
+            "USTT_BatterySaver": "0xa5",
+            "G Mode":            "0xab",
+            "Manual":            "0x0",
+        }
 
         try:
             self.logfile = open("/tmp/tardix-command-center.log", "w")

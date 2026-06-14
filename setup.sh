@@ -357,7 +357,6 @@ set -euo pipefail
 
 # ── metadata ────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/core/app_meta.sh"
 INSTALL_DIR="$INSTALL_DIR"
 LAUNCHER="$LAUNCHER"
 DESKTOP_FILE="$DESKTOP_FILE"

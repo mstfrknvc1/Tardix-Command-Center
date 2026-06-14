@@ -169,15 +169,24 @@ def set_color_and_morph(red, green, blue,red_morph, green_morph, blue_morph, dur
     device.reset()
 
 def remove_animation():
+    """Remove all animations from the LED controller (clears firmware state for Windows handover)."""
     try:
-        set_dim(100)
         elc, device = init_device()
+
+        # Dim to 0 first using the already-open device (avoids a second USB open)
+        try:
+            elc.dim(ZONES, 0)
+        except usb.core.USBError:
+            pass
+
+        # Remove all known power-state animations — continue past individual failures
         for animation in (AC_SLEEP, AC_CHARGED, AC_CHARGING, DC_SLEEP, DC_ON, DC_LOW):
             try:
                 elc.remove_animation(animation)
             except usb.core.USBError:
-                break
+                continue  # one failure should not abort the rest
 
+        # Remove any remaining unknown animations
         seen_animation_ids = set()
         for _ in range(8):
             try:
@@ -196,18 +205,66 @@ def remove_animation():
             try:
                 elc.remove_animation(unknown_animation)
             except usb.core.USBError:
-                break
+                continue
 
         try:
             device.reset()
         except usb.core.USBError:
             pass
-    except usb.core.USBError:
+    except Exception:
         pass
+
+
+def windows_reset():
+    """Full reset for Windows handover: wipes all animations and restores firmware defaults.
+    Returns True on success, False on failure."""
+    try:
+        elc, device = init_device()
+
+        # Remove all power-state animations
+        for animation in (AC_SLEEP, AC_CHARGED, AC_CHARGING, DC_SLEEP, DC_ON, DC_LOW):
+            try:
+                elc.remove_animation(animation)
+            except usb.core.USBError:
+                continue
+
+        # Remove any extra user animations
+        seen_animation_ids = set()
+        for _ in range(16):
+            try:
+                animations = elc.get_animation_count()
+            except usb.core.USBError:
+                break
+            if animations == (0, 0):
+                break
+            unknown_animation = animations[1]
+            if unknown_animation in (0, None) or unknown_animation in seen_animation_ids:
+                break
+            seen_animation_ids.add(unknown_animation)
+            try:
+                elc.remove_animation(unknown_animation)
+            except usb.core.USBError:
+                continue
+
+        # Visually turn off the keyboard (dim=100 = fully dimmed) without
+        # writing any new animations. Windows AWCC will set its own brightness.
+        try:
+            elc.dim(ZONES, 100)
+        except usb.core.USBError:
+            pass
+
+        try:
+            device.reset()
+        except usb.core.USBError:
+            pass
+        return True
+    except Exception:
+        return False
+
 
 def set_dim(level):
     elc, device = init_device()
-    elc.dim(ZONES,level)
+    elc.dim(ZONES, level)
     device.reset()
 
 def set_dual_morph(static_red, static_green, static_blue, morph_red, morph_green, morph_blue, duration):

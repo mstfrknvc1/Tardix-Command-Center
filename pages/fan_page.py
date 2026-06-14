@@ -95,15 +95,16 @@ class FanMixin:
             fan_page.setLayout(root_layout)
         _clear_layout(root_layout)
 
-        self.power_modes_dict = {
-            "USTT_Balanced":     "0xa0",
-            "USTT_Performance":  "0xa1",
-            "USTT_Quiet":        "0xa3",
-            "USTT_FullSpeed":    "0xa4",
-            "USTT_BatterySaver": "0xa5",
-            "G Mode":            "0xab",
-            "Manual":            "0x0",
-        }
+        if not hasattr(self, "power_modes_dict"):
+            self.power_modes_dict = {
+                "USTT_Balanced":     "0xa0",
+                "USTT_Performance":  "0xa1",
+                "USTT_Quiet":        "0xa3",
+                "USTT_FullSpeed":    "0xa4",
+                "USTT_BatterySaver": "0xa5",
+                "G Mode":            "0xab",
+                "Manual":            "0x0",
+            }
 
         group = QGroupBox(self.tr("power_and_fans"), fan_page)
         main_vbox = QVBoxLayout(group)

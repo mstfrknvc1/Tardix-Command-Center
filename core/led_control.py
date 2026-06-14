@@ -109,8 +109,35 @@ class LEDMixin:
             elif mode_key == "dual_morph":
                 self.apply_dual_morph()
             elif mode_key == "windows_setting":
-                print(f"[LED] Windows ayarı kullanılıyor, işlem yapılmıyor")
-                pass
+                print(f"[LED] Windows ayarı seçildi, klavye belleği sıfırlanıyor...")
+                if awelc is not None:
+                    try:
+                        success = awelc.windows_reset()
+                        if success:
+                            print("[LED] ✓ Klavye animasyonları temizlendi, Windows kontrolüne devredildi.")
+                            QMessageBox.information(
+                                self.window,
+                                "Windows'a Devret",
+                                "✅ Klavye animasyonları temizlendi.\n\n"
+                                "Artık Windows'a geçtiğinizde Alienware Command Center\n"
+                                "klavye ışıklarını kontrol edebilecek.",
+                            )
+                        else:
+                            print("[LED] ⚠ windows_reset başarısız (USB cihazı bulunamadı veya erişim reddedildi).")
+                            QMessageBox.warning(
+                                self.window,
+                                "Windows'a Devret",
+                                "⚠️ Klavye sıfırlanamadı.\n\n"
+                                "USB cihazı bulunamadı veya erişim izni yok.\n"
+                                "Uygulamayı 'sudo' ile başlatmayı deneyin veya\n"
+                                "udev kurallarının kurulu olduğunu doğrulayın.",
+                            )
+                    except Exception as err:
+                        if hasattr(self, "log_exception"):
+                            self.log_exception("LED windows_setting error", err)
+                if hasattr(self, "_sync_rgb_mode_settings"):
+                    self._sync_rgb_mode_settings("windows_setting")
+                self.settings.setValue("State", "Off")
             else:
                 print(f"[LED] Bilinmeyen mod veya off: {mode_key}")
                 self.remove_animation()

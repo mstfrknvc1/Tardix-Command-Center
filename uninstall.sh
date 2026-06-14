@@ -2,8 +2,7 @@
 set -euo pipefail
 
 # ── metadata ────────────────────────────────────────────────
-SCRIPT_DIR="/home/mstfrknvc/Belgeler/GitHub/Tardix-Command-Center"
-source "/home/mstfrknvc/Belgeler/GitHub/Tardix-Command-Center/core/app_meta.sh"
+SCRIPT_DIR="/home/mstfrknvc/Masaüstü/tcc/Tardix-Command-Center"
 INSTALL_DIR="/home/mstfrknvc/.local/share/tardix-command-center"
 LAUNCHER="/home/mstfrknvc/.local/bin/tcc"
 DESKTOP_FILE="/home/mstfrknvc/.local/share/applications/tardix-command-center.desktop"
